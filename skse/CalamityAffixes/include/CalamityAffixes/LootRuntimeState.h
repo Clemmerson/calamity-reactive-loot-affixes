@@ -13,6 +13,7 @@
 #include "CalamityAffixes/InstanceAffixSlots.h"
 #include "CalamityAffixes/LootRerollGuard.h"
 #include "CalamityAffixes/LootShuffleBagState.h"
+#include "CalamityAffixes/WorldItemTransitLedger.h"
 
 namespace CalamityAffixes
 {
@@ -60,6 +61,7 @@ namespace CalamityAffixes
 		std::vector<PendingDroppedRefDelete> pendingDroppedRefDeletes{};
 		std::atomic_bool dropDeleteDrainScheduled{ false };
 		std::map<std::pair<LootRerollGuard::FormID, LootRerollGuard::FormID>, std::int32_t> playerContainerStash{};
+		WorldItemTransitLedger worldItemTransits{};
 
 		void ResetForConfigReload() noexcept
 		{
@@ -75,6 +77,7 @@ namespace CalamityAffixes
 			activeProcSlotPenalties.clear();
 			rerollGuard.Reset();
 			playerContainerStash.clear();
+			worldItemTransits.Clear();
 		}
 
 		void ResetForLoadOrRevert() noexcept

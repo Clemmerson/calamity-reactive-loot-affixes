@@ -104,6 +104,19 @@
 		[[nodiscard]] bool IsInstanceKeyTracked(std::uint64_t a_instanceKey) const;
 		void DiscardInstanceKeyState(std::uint64_t a_instanceKey);
 		void RemapInstanceKey(std::uint64_t a_oldKey, std::uint64_t a_newKey);
+		// v2.3.2: a player item that a script drops and adds back (NPC temper
+		// services) moves its state onto the world reference and back.
+		[[nodiscard]] bool MovePlayerItemStateToWorldReference(
+			RE::FormID a_itemFormID,
+			std::uint16_t a_playerUniqueID,
+			RE::FormID a_referenceFormID);
+		[[nodiscard]] bool BindReturnedWorldItemState(
+			RE::FormID a_baseFormID,
+			std::uint64_t a_detachedKey,
+			bool a_logIfNotFound);
+		// Drops the state of items whose held-back delete was real (no return
+		// inside the window), so it is not written to every save from then on.
+		void SweepAbandonedWorldItemTransits();
 		[[nodiscard]] bool NormalizeLegacyPlayerInstanceKeys();
 		[[nodiscard]] bool PruneOrphanedPlayerInstanceKeys();
 		void ProcessDroppedRefDeleted(

@@ -635,6 +635,16 @@ namespace CalamityAffixes
 			IsInstanceKeyTracked(referenceDetachedWorldKey)) {
 			detachedWorldKey = referenceDetachedWorldKey;
 		}
+		if (!IsInstanceKeyTracked(detachedWorldKey) && a_event->oldContainer == LootRerollGuard::kWorldContainer) {
+			// A script drop names no reference on either container event; the
+			// unique-ID change recorded where the state went.
+			SweepAbandonedWorldItemTransits();
+			if (const auto transit = _lootState.worldItemTransits.Find(
+					a_event->baseObj, referenceFormID, StatusClock::RealNowMs());
+				transit && IsInstanceKeyTracked(transit->detachedKey)) {
+				detachedWorldKey = transit->detachedKey;
+			}
+		}
 		const bool trackedDetachedWorldState = IsInstanceKeyTracked(detachedWorldKey);
 		if (guardedDropKey.has_value() || trackedDetachedWorldState) {
 			const auto pickupKey = a_event->uniqueID != 0u ?
@@ -652,13 +662,33 @@ namespace CalamityAffixes
 					DiscardInstanceKeyState(pickupKey);
 				} else {
 					RemapInstanceKey(detachedWorldKey, pickupKey);
+					_lootState.worldItemTransits.Forget(detachedWorldKey);
 				}
-			} else if (trackedDetachedWorldState) {
-				SKSE::log::warn(
-					"CalamityAffixes: retained detached world state because pickup had no stable player UID (baseObj={:08X}, ref={:08X}, detachedKey={:016X}).",
-					a_event->baseObj,
-					referenceFormID,
-					detachedWorldKey);
+			} else if (trackedDetachedWorldState && !BindReturnedWorldItemState(a_event->baseObj, detachedWorldKey, false)) {
+				// The item may land in the inventory after this event: try once more
+				// on the next task, which runs before the world reference's delete
+				// cleanup queued after it.
+				const auto baseObj = a_event->baseObj;
+				const auto retryKey = detachedWorldKey;
+				const auto warnRetained = [baseObj, retryKey]() {
+					SKSE::log::warn(
+						"CalamityAffixes: retained detached world state because pickup had no stable player UID (baseObj={:08X}, detachedKey={:016X}).",
+						baseObj,
+						retryKey);
+				};
+				if (auto* task = SKSE::GetTaskInterface(); task) {
+					task->AddTask([baseObj, retryKey, warnRetained]() {
+						if (auto* bridge = EventBridge::GetSingleton(); bridge) {
+							const std::scoped_lock lock(bridge->_stateMutex);
+							if (bridge->IsInstanceKeyTracked(retryKey) &&
+								!bridge->BindReturnedWorldItemState(baseObj, retryKey, true)) {
+								warnRetained();
+							}
+						}
+					});
+				} else {
+					warnRetained();
+				}
 			}
 			if (_loot.debugLog) {
 				SKSE::log::debug(
@@ -749,6 +779,20 @@ namespace CalamityAffixes
 					a_event->oldUniqueID,
 					a_event->newUniqueID);
 			}
+			return RE::BSEventNotifyControl::kContinue;
+		}
+		// A player item that became a loose world reference (a script drop with no
+		// reference on its container event): move its state onto the reference
+		// before the drop's orphan prune can erase it.
+		if (const auto* uidPlayer = RE::PlayerCharacter::GetSingleton();
+			uidPlayer &&
+			IsPlayerItemBecomingWorldReference(
+				uidPlayer->GetFormID(),
+				oldOwnerID,
+				newOwnerID,
+				a_event->oldUniqueID,
+				a_event->newUniqueID) &&
+			MovePlayerItemStateToWorldReference(itemFormID, a_event->oldUniqueID, newOwnerID)) {
 			return RE::BSEventNotifyControl::kContinue;
 		}
 		if (a_event->oldUniqueID == 0 || a_event->newUniqueID == 0) {
@@ -987,6 +1031,152 @@ namespace CalamityAffixes
 			_runewordState.selectedBaseKey = a_newKey;
 		}
 		_instanceTrackingState.equippedTokenCacheReady = false;
+	}
+
+	bool EventBridge::MovePlayerItemStateToWorldReference(
+		RE::FormID a_itemFormID,
+		std::uint16_t a_playerUniqueID,
+		RE::FormID a_referenceFormID)
+	{
+		auto* player = RE::PlayerCharacter::GetSingleton();
+		if (!player || a_itemFormID == 0u || a_playerUniqueID == 0u || a_referenceFormID == 0u) {
+			return false;
+		}
+		const auto sourceKey = MakeInstanceKey(player->GetFormID(), a_playerUniqueID);
+		if (!HasMaterialInstanceState(sourceKey)) {
+			return false;
+		}
+		// Only the item itself as a loose reference: not an actor, and the same base.
+		auto* ref = RE::TESForm::LookupByID<RE::TESObjectREFR>(a_referenceFormID);
+		auto* base = ref ? ref->GetBaseObject() : nullptr;
+		if (!ref || ref->As<RE::Actor>() || !base || base->GetFormID() != a_itemFormID) {
+			if (_loot.debugLog) {
+				SKSE::log::debug(
+					"CalamityAffixes: kept player item state; the new owner is not the item's world reference (item={:08X}, uid={}, newOwner={:08X}).",
+					a_itemFormID,
+					a_playerUniqueID,
+					a_referenceFormID);
+			}
+			return false;
+		}
+		const auto detachedKey = MakeDetachedWorldInstanceKey(a_referenceFormID);
+		if (HasMaterialInstanceState(detachedKey)) {
+			SKSE::log::warn(
+				"CalamityAffixes: kept player item state; its world reference already holds state (item={:08X}, uid={}, ref={:08X}).",
+				a_itemFormID,
+				a_playerUniqueID,
+				a_referenceFormID);
+			return false;
+		}
+		SweepAbandonedWorldItemTransits();
+		RemapInstanceKey(sourceKey, detachedKey);
+		_lootState.worldItemTransits.Record(WorldItemTransit{
+			.baseFormID = a_itemFormID,
+			.referenceFormID = a_referenceFormID,
+			.detachedKey = detachedKey,
+			.recordedAtMs = StatusClock::RealNowMs(),
+		});
+		SKSE::log::info(
+			"CalamityAffixes: moved player item state onto its world reference (item={:08X}, uid={}, ref={:08X}, key={:016X}).",
+			a_itemFormID,
+			a_playerUniqueID,
+			a_referenceFormID,
+			detachedKey);
+		return true;
+	}
+
+	bool EventBridge::BindReturnedWorldItemState(
+		RE::FormID a_baseFormID,
+		std::uint64_t a_detachedKey,
+		bool a_logIfNotFound)
+	{
+		auto* player = RE::PlayerCharacter::GetSingleton();
+		auto* changes = player ? player->GetInventoryChanges() : nullptr;
+		if (!changes || !changes->entryList || a_baseFormID == 0u || !IsInstanceKeyTracked(a_detachedKey)) {
+			return false;
+		}
+		// The detached key names the world reference the item was.
+		const auto referenceFormID = static_cast<RE::FormID>(a_detachedKey >> 16u);
+		// The engine rewrote the dropped item's unique ID to (reference, 0); back
+		// in the inventory it may still carry that, or none at all (see
+		// ChooseReturnedItem for which copy may be taken).
+		RE::ExtraDataList* exact = nullptr;
+		std::uint32_t exactCount = 0u;
+		RE::ExtraDataList* loose = nullptr;
+		std::uint32_t looseCount = 0u;
+		for (auto* entry : *changes->entryList) {
+			if (!entry || !entry->object || entry->object->GetFormID() != a_baseFormID || !entry->extraLists) {
+				continue;
+			}
+			for (auto* xList : *entry->extraLists) {
+				if (!xList) {
+					continue;
+				}
+				const auto* uid = xList->GetByType<RE::ExtraUniqueID>();
+				if (uid && uid->uniqueID != 0u && uid->baseID != referenceFormID) {
+					continue;  // a stable unique ID: some other copy
+				}
+				if (uid && uid->baseID == referenceFormID) {
+					exact = xList;
+					++exactCount;
+					continue;
+				}
+				loose = xList;
+				++looseCount;
+			}
+		}
+		const auto choice = ChooseReturnedItem(exactCount, looseCount);
+		auto* target = choice == ReturnedItemChoice::kExact ? exact :
+		               choice == ReturnedItemChoice::kLoose ? loose :
+		                                                      nullptr;
+		if (!target) {
+			if (a_logIfNotFound || exactCount + looseCount > 1u) {
+				SKSE::log::warn(
+					"CalamityAffixes: could not tell which returned item to rebind (base={:08X}, ref={:08X}, exact={}, loose={}, key={:016X}).",
+					a_baseFormID,
+					referenceFormID,
+					exactCount,
+					looseCount,
+					a_detachedKey);
+			}
+			return false;
+		}
+		auto* uid = target->GetByType<RE::ExtraUniqueID>();
+		if (!uid) {
+			uid = RE::BSExtraData::Create<RE::ExtraUniqueID>();
+			if (!uid) {
+				return false;
+			}
+			target->Add(uid);
+		}
+		uid->baseID = player->GetFormID();
+		uid->uniqueID = changes->GetNextUniqueID();
+		const auto pickupKey = MakeInstanceKey(uid->baseID, uid->uniqueID);
+		RemapInstanceKey(a_detachedKey, pickupKey);
+		_lootState.worldItemTransits.Forget(a_detachedKey);
+		SKSE::log::info(
+			"CalamityAffixes: rebound a returned world item to the player (base={:08X}, ref={:08X}, key={:016X} -> {:016X}).",
+			a_baseFormID,
+			referenceFormID,
+			a_detachedKey,
+			pickupKey);
+		return true;
+	}
+
+	void EventBridge::SweepAbandonedWorldItemTransits()
+	{
+		std::array<std::uint64_t, WorldItemTransitLedger::kCapacity> abandoned{};
+		const auto count = _lootState.worldItemTransits.TakeAbandoned(StatusClock::RealNowMs(), abandoned);
+		for (std::size_t i = 0; i < count; ++i) {
+			const auto key = abandoned[i];
+			if (!IsInstanceKeyTracked(key) || PlayerHasInstanceKey(key)) {
+				continue;
+			}
+			DiscardInstanceKeyState(key);
+			SKSE::log::info(
+				"CalamityAffixes: pruned a world item that was deleted and never came back (key={:016X}).",
+				key);
+		}
 	}
 
 

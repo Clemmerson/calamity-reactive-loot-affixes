@@ -1,6 +1,6 @@
 # Calamity Effect List
 
-> Version `v2.3.1` (2026-10-30). Generated from the mod data; every line is the in-game English text.
+> Version `v2.3.2` (2026-11-07). Generated from the mod data; every line is the in-game English text.
 > Korean lists: [prefixes](PREFIX_EFFECTS.md), [suffixes](SUFFIX_EFFECTS.md), [runewords](RUNEWORD_EFFECTS.md). Project: [GitHub](https://github.com/servaltullius/calamity-reactive-loot-affixes)
 
 Each item has **3 affix slots**: a head slot that holds **a runeword or a prefix**, then up to **2 suffixes**.

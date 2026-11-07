@@ -104,6 +104,7 @@ namespace CalamityAffixes
 		ClearTrapRuntimeState("pre-save");
 		// The trap worker puts the bow draw speed back on its next tick.
 		RemoveBowDrawSpeed();
+		SweepAbandonedWorldItemTransits();
 		if (_loot.debugLog) {
 			SKSE::log::debug(
 				"CalamityAffixes: pre-save trap cleanup complete (activeTraps={}, unresolvedDeferred={}).",
@@ -393,8 +394,20 @@ namespace CalamityAffixes
 		if (PlayerHasInstanceKey(key)) {
 			return;
 		}
+		// A script drop (NPC temper services) reports the reference deleted right
+		// after the drop and then adds it back; keep the state for that pickup.
+		if (_lootState.worldItemTransits.IsAwaitingReturn(key, StatusClock::RealNowMs())) {
+			// No second signal comes: remember it so the sweep can prune the state
+			// if the item does not come back after all.
+			_lootState.worldItemTransits.MarkDeleteSeen(key);
+			if (_loot.debugLog) {
+				SKSE::log::debug("CalamityAffixes: kept world item state awaiting its return (key={:016X}).", key);
+			}
+			return;
+		}
 
 		DiscardInstanceKeyState(key);
+		_lootState.worldItemTransits.Forget(key);
 		if (_loot.debugLog) {
 			SKSE::log::debug("CalamityAffixes: pruned instance affix (world ref deleted) (key={:016X}).", key);
 		}
