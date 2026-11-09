@@ -1,0 +1,170 @@
+<table style="width:100%;border-collapse:collapse;margin:0 0 18px 0;" cellpadding="0">
+<tbody>
+<tr>
+<td style="background-color:#1d1a16;border:2px solid #a8843f;padding:26px 18px 22px 18px;text-align:center;">
+<p style="margin:0;"><span style="font-size:12px;color:#c9b88c;letter-spacing:4px;"><b>REACTIVE LOOT &amp; AFFIXES</b></span></p>
+<p style="margin:10px 0 0 0;"><span style="font-size:34px;color:#ece5d6;"><b>칼라미티 2</b></span></p>
+<p style="margin:6px 0 0 0;"><span style="font-size:15px;color:#c9b88c;letter-spacing:2px;">━━━━ &nbsp;<b>v2.3.1 · v2.3.2 핫픽스</b>&nbsp; ━━━━</span></p>
+<p style="margin:14px 0 0 0;"><span style="font-size:15px;color:#d8cfbd;">NPC에게 맡긴 강화, 체력 강화, 메뉴 속 시간까지<br>2.3.0 이후 받은 제보를 모두 고쳤어요.</span></p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p style="text-align:center;margin:0 0 6px 0;"><a href="https://www.nexusmods.com/skyrimspecialedition/mods/193193"><b>📦 넥서스 페이지</b></a> &nbsp;&nbsp; <a href="https://github.com/servaltullius/calamity-reactive-loot-affixes/releases/tag/v2.3.2"><b>📜 2.3.2 노트</b></a> &nbsp;&nbsp; <a href="https://github.com/servaltullius/calamity-reactive-loot-affixes/releases/tag/v2.3.1"><b>📜 2.3.1 노트</b></a></p>
+<p style="text-align:center;margin:0 0 20px 0;"><span style="font-size:13px;color:#8a8070;">ESP·세이브 형식 그대로 · 새 게임 필요 없음 · 2.3.0에서 바로 교체</span></p>
+
+<table style="width:100%;border-collapse:collapse;margin:0 0 26px 0;" cellpadding="0">
+<tbody>
+<tr>
+<td style="background-color:#f7f1e3;border:1px solid #d9c9a3;border-left:5px solid #a8843f;padding:14px 18px;">
+<p style="margin:0 0 10px 0;"><span style="font-size:15px;color:#7a5f2a;"><b>✦ 한눈에 보기</b></span></p>
+<p style="margin:0 0 7px 0;color:#3b2f1e;"><span style="background-color:#c9a96a;color:#1d1a16;font-size:12px;padding:1px 7px;"><b>2.3.2</b></span>&nbsp; 대장장이 NPC에게 강화를 맡겨도 <b>어픽스가 그대로 남아요</b></p>
+<p style="margin:0 0 7px 0;color:#3b2f1e;"><span style="background-color:#e3d6b8;color:#1d1a16;font-size:12px;padding:1px 7px;"><b>2.3.1</b></span>&nbsp; 저체력 룬워드·대마법사가 <b>체력·매지카 강화를 반영해요</b></p>
+<p style="margin:0 0 7px 0;color:#3b2f1e;"><span style="background-color:#e3d6b8;color:#1d1a16;font-size:12px;padding:1px 7px;"><b>2.3.1</b></span>&nbsp; 어픽스를 불러오지 못해도 <b>장비에서 지우지 않아요</b></p>
+<p style="margin:0;color:#3b2f1e;"><span style="background-color:#e3d6b8;color:#1d1a16;font-size:12px;padding:1px 7px;"><b>2.3.1</b></span>&nbsp; 메뉴를 여는 동안 <b>공용 상태 시간도 멈춰요</b></p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<table style="width:100%;border-collapse:collapse;margin:0 0 12px 0;" cellpadding="0">
+<tbody>
+<tr>
+<td style="width:56px;background-color:#a8843f;text-align:center;padding:8px 0;"><span style="font-size:20px;color:#1d1a16;"><b>01</b></span></td>
+<td style="background-color:#1d1a16;padding:8px 14px;"><span style="font-size:18px;color:#ece5d6;"><b>NPC에게 강화를 맡기면 어픽스가 사라지던 문제</b></span> &nbsp;<span style="font-size:12px;color:#c9b88c;">2.3.2</span></td>
+</tr>
+</tbody>
+</table>
+<p>대장장이에게 돈을 내고 강화를 맡기는 모드(<b>Temper and Recharge Services</b> 등, 떼껄룩에도 들어 있어요)를 쓰면, 강화된 장비에서 어픽스가 사라졌어요. 제보해 주신 덕분에 원인을 찾았어요. 고마워요! 🙇</p>
+<p style="margin:14px 0 6px 0;"><span style="font-size:14px;color:#7a5f2a;"><b>이 모드가 강화하는 방식</b></span></p>
+<table style="width:100%;border-collapse:collapse;text-align:center;" cellpadding="10">
+<tbody>
+<tr>
+<td style="width:30%;border:1px solid #d9c9a3;background-color:#fbf8f1;"><span style="font-size:22px;">⬇️</span><br><b>바닥에 떨어뜨림</b><br><span style="font-size:13px;color:#8a8070;">장비를 잠깐 내려놓고</span></td>
+<td style="width:5%;"><span style="font-size:18px;color:#a8843f;"><b>▶</b></span></td>
+<td style="width:30%;border:1px solid #d9c9a3;background-color:#fbf8f1;"><span style="font-size:22px;">🔨</span><br><b>강화</b><br><span style="font-size:13px;color:#8a8070;">바닥에 있는 장비를 강화하고</span></td>
+<td style="width:5%;"><span style="font-size:18px;color:#a8843f;"><b>▶</b></span></td>
+<td style="width:30%;border:1px solid #d9c9a3;background-color:#fbf8f1;"><span style="font-size:22px;">🎒</span><br><b>다시 넣음</b><br><span style="font-size:13px;color:#8a8070;">인벤토리로 돌려줘요</span></td>
+</tr>
+</tbody>
+</table>
+<table style="width:100%;border-collapse:collapse;margin:10px 0 0 0;" cellpadding="10">
+<tbody>
+<tr>
+<td style="width:50%;border:1px solid #e0b4aa;background-color:#fdf3f1;vertical-align:top;"><span style="color:#b03a2e;"><b>✗ 2.3.1까지</b></span><br><span style="color:#3b2f1e;">떨어뜨리는 순간 칼라미티가 어픽스 기록을 놓쳐서, 주인 없는 기록으로 보고 지웠어요.</span></td>
+<td style="width:50%;border:1px solid #b8d2a8;background-color:#f3f8ef;vertical-align:top;"><span style="color:#3d7a2a;"><b>✓ 2.3.2부터</b></span><br><span style="color:#3b2f1e;">떨어지는 순간 기록을 같이 옮겨 두고, 돌아온 장비에 다시 붙여요.</span></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><b>착용 중인 장비를 맡겨도</b> 확인했어요. 돌아온 장비를 다시 끼면 어픽스가 그대로 동작해요.</li>
+<li>숫돌·작업대에서 <b>직접 강화하는 건 원래 괜찮았어요.</b></li>
+</ul>
+<table style="width:100%;border-collapse:collapse;margin:6px 0 30px 0;" cellpadding="10">
+<tbody>
+<tr>
+<td style="border:1px solid #e0b4aa;border-left:5px solid #b03a2e;background-color:#fdf3f1;"><span style="color:#b03a2e;"><b>⚠ 주의</b></span>&nbsp; <span style="color:#3b2f1e;">이미 사라진 어픽스는 되돌릴 수 없어요.</span></td>
+</tr>
+</tbody>
+</table>
+
+<table style="width:100%;border-collapse:collapse;margin:0 0 12px 0;" cellpadding="0">
+<tbody>
+<tr>
+<td style="width:56px;background-color:#a8843f;text-align:center;padding:8px 0;"><span style="font-size:20px;color:#1d1a16;"><b>02</b></span></td>
+<td style="background-color:#1d1a16;padding:8px 14px;"><span style="font-size:18px;color:#ece5d6;"><b>저체력 룬워드와 대마법사가 강화를 반영해요</b></span> &nbsp;<span style="font-size:12px;color:#c9b88c;">2.3.1</span></td>
+</tr>
+</tbody>
+</table>
+<p>사자의 심장·마지막 소원·추방 같은 <b>저체력 룬워드</b>가 체력 비율을 기본 최대 체력으로만 계산해서, 마법부여·물약 등으로 최대 체력을 올리면 설명보다 훨씬 늦게 발동했어요. 이제 <b>체력 바와 같은 최대 체력</b>을 써요.</p>
+<p style="margin:14px 0 6px 0;"><span style="font-size:14px;color:#7a5f2a;"><b>예시</b></span> <span style="font-size:13px;color:#8a8070;">기본 체력 300 + 체력 강화 150, '체력 40% 이하'에 발동하는 룬워드</span></p>
+<table style="width:100%;border-collapse:collapse;text-align:center;" cellpadding="12">
+<tbody>
+<tr>
+<td style="width:46%;border:1px solid #d6d0c4;background-color:#f5f3ef;"><span style="font-size:13px;color:#8a8070;">2.3.0까지</span><br><span style="font-size:30px;color:#8a8070;"><b>120</b></span><span style="font-size:14px;color:#8a8070;"> HP</span><br><span style="font-size:13px;color:#8a8070;">체력 바로 약 27%에서 발동</span></td>
+<td style="width:8%;"><span style="font-size:22px;color:#a8843f;"><b>➜</b></span></td>
+<td style="width:46%;border:2px solid #a8843f;background-color:#f7f1e3;"><span style="font-size:13px;color:#7a5f2a;"><b>2.3.1부터</b></span><br><span style="font-size:30px;color:#7a5f2a;"><b>180</b></span><span style="font-size:14px;color:#7a5f2a;"> HP</span><br><span style="font-size:13px;color:#3b2f1e;">설명대로 <b>40%</b>에서 발동</span></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>출혈 축적이 터질 때의 '최대 체력 %' 피해도 같은 기준으로 맞췄어요.</li>
+<li><b>대마법사</b>의 '최대 매지카 %' 비용과 피해도 매지카 강화를 반영해요. 강화가 있으면 피해와 소모 매지카가 함께 늘어요.</li>
+</ul>
+<p style="margin:0 0 30px 0;">&nbsp;</p>
+
+<table style="width:100%;border-collapse:collapse;margin:0 0 12px 0;" cellpadding="0">
+<tbody>
+<tr>
+<td style="width:56px;background-color:#a8843f;text-align:center;padding:8px 0;"><span style="font-size:20px;color:#1d1a16;"><b>03</b></span></td>
+<td style="background-color:#1d1a16;padding:8px 14px;"><span style="font-size:18px;color:#ece5d6;"><b>그 밖의 수정</b></span> &nbsp;<span style="font-size:12px;color:#c9b88c;">2.3.1</span></td>
+</tr>
+</tbody>
+</table>
+<table style="width:100%;border-collapse:collapse;" cellpadding="11">
+<tbody>
+<tr>
+<td style="width:34%;border:1px solid #d9c9a3;background-color:#fbf8f1;vertical-align:top;"><b>🛡 어픽스 보존</b></td>
+<td style="border:1px solid #d9c9a3;vertical-align:top;">다른 버전의 ESP가 로드되는 등으로 어픽스를 불러오지 못해도 <b>장비에서 지우지 않아요.</b> 원인이 풀리면 다시 동작하고, 그동안 그 장비는 제작이 막히며 패널에 이유가 나와요.</td>
+</tr>
+<tr>
+<td style="border:1px solid #d9c9a3;background-color:#fbf8f1;vertical-align:top;"><b>⏳ 메뉴 속 상태 시간</b></td>
+<td style="border:1px solid #d9c9a3;vertical-align:top;">인벤토리·지도처럼 게임이 멈추는 메뉴를 여는 동안 <b>노출·빙결·출혈·감전 기록의 시간도 멈춰요.</b> 예전엔 메뉴를 닫으면 미터가 줄어 있었어요.</td>
+</tr>
+<tr>
+<td style="border:1px solid #d9c9a3;background-color:#fbf8f1;vertical-align:top;"><b>🧹 옛 세이브 정리</b></td>
+<td style="border:1px solid #d9c9a3;vertical-align:top;">다른 모드나 콘솔이 넣은 능력치 보정까지 깎을 수 있던 문제를 고쳤어요.</td>
+</tr>
+<tr>
+<td style="border:1px solid #d9c9a3;background-color:#fbf8f1;vertical-align:top;"><b>❤ 불러오기 직후</b></td>
+<td style="border:1px solid #d9c9a3;vertical-align:top;">세이브를 불러오는 순간 받은 피해에 저체력 검사가 한 번 빠질 수 있던 문제를 고쳤어요.</td>
+</tr>
+<tr>
+<td style="border:1px solid #d9c9a3;background-color:#fbf8f1;vertical-align:top;"><b>🪟 패널</b></td>
+<td style="border:1px solid #d9c9a3;vertical-align:top;">패널을 연 채 죽어서 다시 불러오면 패널이 화면에 남던 문제를 고쳤어요.</td>
+</tr>
+<tr>
+<td style="border:1px solid #d9c9a3;background-color:#fbf8f1;vertical-align:top;"><b>🔮 룬워드 대체 효과</b></td>
+<td style="border:1px solid #d9c9a3;vertical-align:top;">룬워드를 불러오지 못했을 때 쓰는 대체 효과 일부가 없는 주문을 찾던 문제를 고쳤어요.</td>
+</tr>
+</tbody>
+</table>
+<p style="margin:0 0 30px 0;">&nbsp;</p>
+
+<table style="width:100%;border-collapse:collapse;margin:0 0 12px 0;" cellpadding="0">
+<tbody>
+<tr>
+<td style="width:56px;background-color:#a8843f;text-align:center;padding:8px 0;"><span style="font-size:20px;color:#1d1a16;"><b>04</b></span></td>
+<td style="background-color:#1d1a16;padding:8px 14px;"><span style="font-size:18px;color:#ece5d6;"><b>업데이트 방법</b></span></td>
+</tr>
+</tbody>
+</table>
+<table style="width:100%;border-collapse:collapse;" cellpadding="10">
+<tbody>
+<tr>
+<td style="width:40px;text-align:center;vertical-align:top;"><span style="background-color:#c9a96a;color:#1d1a16;padding:2px 8px;"><b>1</b></span></td>
+<td style="vertical-align:top;"><b>2.3.2 전체 ZIP</b>을 MO2나 Vortex로 설치하고 기존 칼라미티를 <b>교체(Replace)</b>하세요. DLL만 따로 바꾸면 안 돼요.</td>
+</tr>
+<tr>
+<td style="text-align:center;vertical-align:top;"><span style="background-color:#c9a96a;color:#1d1a16;padding:2px 8px;"><b>2</b></span></td>
+<td style="vertical-align:top;">2.3.1은 건너뛰어도 돼요. 2.3.2에 모두 들어 있어요.</td>
+</tr>
+<tr>
+<td style="text-align:center;vertical-align:top;"><span style="background-color:#c9a96a;color:#1d1a16;padding:2px 8px;"><b>3</b></span></td>
+<td style="vertical-align:top;">새 게임은 필요 없어요. 처음 쓰시는 분은 <a href="https://www.nexusmods.com/skyrimspecialedition/mods/193193">넥서스 페이지</a> 설명을 봐 주세요. 패널은 기본 <b>F11</b>로 열려요.</td>
+</tr>
+</tbody>
+</table>
+
+<table style="width:100%;border-collapse:collapse;margin:30px 0 0 0;" cellpadding="0">
+<tbody>
+<tr>
+<td style="background-color:#1d1a16;border:1px solid #a8843f;padding:16px 18px;text-align:center;">
+<p style="margin:0;"><span style="font-size:15px;color:#ece5d6;">버그나 의견은 댓글이나 넥서스 페이지에 남겨 주세요 🙏</span></p>
+<p style="margin:6px 0 0 0;"><span style="font-size:12px;color:#c9b88c;">로그(문서/My Games/Skyrim Special Edition/SKSE/CalamityAffixes.log)를 함께 주시면 원인을 찾기 훨씬 쉬워요.</span></p>
+</td>
+</tr>
+</tbody>
+</table>
+<p style="text-align:center;margin:12px 0 0 0;"><span style="font-size:13px;color:#8a8070;">전체 변경 이력</span>&nbsp; <a href="https://github.com/servaltullius/calamity-reactive-loot-affixes/blob/main/CHANGELOG.md">CHANGELOG</a> · <a href="https://github.com/servaltullius/calamity-reactive-loot-affixes/blob/main/docs/RUNEWORD_EFFECTS.md">룬워드 95종</a> · <a href="https://github.com/servaltullius/calamity-reactive-loot-affixes/blob/main/docs/PREFIX_EFFECTS.md">접두 73종</a> · <a href="https://github.com/servaltullius/calamity-reactive-loot-affixes/blob/main/docs/SUFFIX_EFFECTS.md">접미 66종</a></p>
