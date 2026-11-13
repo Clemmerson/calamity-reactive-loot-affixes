@@ -962,41 +962,49 @@ namespace
 		Check(Next(t, o) == Action::kNone, "waits for the sheathe");
 		o.weaponDrawn = false;
 		o.nowMs = 1048;
+		Check(Next(t, o) == Action::kNone, "PC1.2: the weapon flag reads sheathed 16 ms after the request: never placed while the sheathe animates");
+		o.nowMs = 1016 + kSheatheFloorMs - 1;
+		Check(Next(t, o) == Action::kNone && !t.ready, "PC1.2: still inside the sheathe floor");
+		o.nowMs = 1916;
+		Check(Next(t, o) == Action::kNone && t.readyPolls == 1u, "PC1.2: first quiet poll after the floor");
+		o.nowMs = 1966;
+		Check(Next(t, o) == Action::kReady && t.ready, "PC1.2: two quiet polls 50 ms apart: ready");
+		o.nowMs = 2048;
 		Check(Next(t, o) == Action::kPlace && t.phase == Phase::kSettle, "off the datum: place the player on it");
 		Check(Next(t, o) == Action::kNone, "never activates in the placement frame");
-		o.nowMs = 1064;
+		o.nowMs = 2064;
 		Check(Next(t, o) == Action::kNone && t.phase == Phase::kSettle, "waits while the move has not applied");
 		o.planarToDatum = 0.0f;
 		o.movedSinceLastPoll = 900.0f;
-		o.nowMs = 1080;
+		o.nowMs = 2080;
 		Check(Next(t, o) == Action::kNone && t.settledPolls == 0u, "the poll that sees the move land is not still yet");
 		o.movedSinceLastPoll = 0.0f;
-		o.nowMs = 1096;
+		o.nowMs = 2096;
 		Check(Next(t, o) == Action::kNone && t.settledPolls == 1u, "first settled poll");
-		o.nowMs = 1110;
+		o.nowMs = 2110;
 		Check(Next(t, o) == Action::kNone && t.settledPolls == 1u, "settled polls must be 50 ms apart");
-		o.nowMs = 1146;
+		o.nowMs = 2146;
 		Check(Next(t, o) == Action::kNone && t.phase == Phase::kActivate, "two settled polls: ready to activate");
-		o.nowMs = 1162;
+		o.nowMs = 2162;
 		Check(Next(t, o) == Action::kActivate && t.attempts == 1u && t.phase == Phase::kVerifySeat, "activates from the settled datum");
-		o.nowMs = 1400;
+		o.nowMs = 2400;
 		Check(Next(t, o) == Action::kNone, "no second activation inside the spacing");
 		o.sitState = 2;
 		o.occupiesStance = true;
-		o.nowMs = 1700;
+		o.nowMs = 2700;
 		Check(Next(t, o) == Action::kNone && t.phase == Phase::kVerifySeat, "never re-activates while the sit animation runs");
 		o.sitState = 3;
-		o.nowMs = 1716;
+		o.nowMs = 2716;
 		Check(Next(t, o) == Action::kNone, "seated once is not yet settled");
-		o.nowMs = 1816;
+		o.nowMs = 2816;
 		Check(Next(t, o) == Action::kReportSeated, "seated on two polls 100 ms apart: SEATED");
-		o.nowMs = 1832;
+		o.nowMs = 2832;
 		Check(Next(t, o) == Action::kNone, "SEATED is reported once");
 		o.occupiesStance = false;
 		o.sitState = 4;
-		o.nowMs = 2000;
+		o.nowMs = 3000;
 		Check(Next(t, o) == Action::kNone, "a loss shorter than 250 ms is not yet reported");
-		o.nowMs = 2260;
+		o.nowMs = 3260;
 		Check(Next(t, o) == Action::kReportUnseated, "a verified seat lost for 250 ms: SEATED 0");
 		// R3-E10 regression (r3 attempt 1): 135.9 units, third person, no weapon -> PLACE first, never an activation off the datum
 		Tracker r{};
@@ -1096,6 +1104,103 @@ namespace
 		transition.sitState = 3;
 		transition.nowMs = 832;
 		Check(Next(progressing, transition) == Action::kNone && progressing.seatedSinceMs == 832, "real seated state enters stability verification");
+		// PC1.2 readiness gate (2026-11-10 live vectors: sessions 5 and 9 placed 17 ms after the sheathe and never sat)
+		{
+			Tracker q{};
+			Observation v{};
+			v.firstPerson = true;
+			v.weaponDrawn = true;
+			v.weaponState = 3;
+			v.thirdPersonActive = false;
+			v.planarToDatum = 134.1f;
+			v.nowMs = 12;
+			Check(Next(q, v) == Action::kForceThirdPerson, "PC1.2 live: first person forces third person");
+			v.firstPerson = false;
+			v.thirdPersonActive = true;
+			v.nowMs = 23;
+			Check(Next(q, v) == Action::kSheathe, "PC1.2 live: then sheathes");
+			v.weaponDrawn = false;
+			v.weaponState = 0;
+			v.nowMs = 40;
+			Check(Next(q, v) == Action::kNone, "PC1.2 live: the t=40 ms placement of sessions 5/9 is not issued");
+			v.graphEquipBusy = true;
+			int placedWhileBusy = 0;
+			for (std::int64_t ms = 56; ms < 23 + kSheatheFloorMs + 300; ms += 16) {
+				v.nowMs = ms;
+				if (Next(q, v) == Action::kPlace) ++placedWhileBusy;
+			}
+			Check(placedWhileBusy == 0 && !q.ready, "PC1.2: never placed while the graph is unequipping (inside the cap)");
+			v.graphEquipBusy = false;
+			bool readied = false;
+			std::int64_t readyAt = -1;
+			std::int64_t placeAt = -1;
+			for (std::int64_t ms = 23 + kSheatheFloorMs + 316; ms < 4000 && placeAt < 0; ms += 16) {
+				v.nowMs = ms;
+				const auto act = Next(q, v);
+				if (act == Action::kReady) { readied = true; readyAt = ms; }
+				if (act == Action::kPlace) placeAt = ms;
+			}
+			Check(readied && placeAt > readyAt && readyAt > 0, "PC1.2: once quiet on two polls: ready, then placed");
+			// a raw transition state (kSheathing = 5) also holds even if the convenience flag is wrong
+			Tracker w{};
+			Observation x{};
+			x.planarToDatum = 50.0f;
+			x.weaponDrawn = true;
+			x.nowMs = 0;
+			Check(Next(w, x) == Action::kSheathe, "sheathe requested");
+			x.weaponDrawn = false;
+			x.weaponState = 5;
+			bool placedInTransition = false;
+			for (std::int64_t ms = 16; ms < kReadyCapMs - 16; ms += 16) {
+				x.nowMs = ms;
+				if (Next(w, x) == Action::kPlace) placedInTransition = true;
+			}
+			Check(!placedInTransition, "PC1.2: a raw sheathing weapon state holds the placement");
+			x.nowMs = kReadyCapMs;
+			Check(Next(w, x) == Action::kReadyCapped && w.ready, "PC1.2: bounded: the cap releases the gate (never stalls entry)");
+			x.nowMs = kReadyCapMs + 16;
+			Check(Next(w, x) == Action::kPlace, "PC1.2: after the cap the acquisition proceeds as before");
+			// camera switch alone: observed third person, two polls, no sheathe floor
+			Tracker c{};
+			Observation cam{};
+			cam.firstPerson = true;
+			cam.thirdPersonActive = false;
+			cam.planarToDatum = 86.9f;
+			cam.nowMs = 10;
+			Check(Next(c, cam) == Action::kForceThirdPerson, "camera: force third person");
+			cam.firstPerson = false;  // the flag flips at once ...
+			cam.nowMs = 21;
+			Check(Next(c, cam) == Action::kNone && c.readyPolls == 0u, "PC1.2: ... but the camera state is not yet third person: not quiet, not placed");
+			cam.thirdPersonActive = true;
+			cam.nowMs = 37;
+			Check(Next(c, cam) == Action::kNone && c.readyPolls == 1u, "PC1.2: camera observed third person: first quiet poll");
+			cam.nowMs = 87;
+			Check(Next(c, cam) == Action::kReady, "PC1.2: camera ready after two polls 50 ms apart (no sheathe floor)");
+			cam.nowMs = 103;
+			Check(Next(c, cam) == Action::kPlace && c.placeAttempts == 1u, "PC1.2: then exactly one placement");
+			// no transition requested (third person, sheathed): the gate never engages (the 26/26 path is unchanged)
+			Tracker n{};
+			Observation plain{};
+			plain.planarToDatum = 102.7f;
+			plain.nowMs = 11;
+			Check(Next(n, plain) == Action::kPlace && n.transitionRequestedMs < 0, "PC1.2: no requested transition: placement as before");
+			// the single-use activation path and the no-reactivation abort are unchanged by the gate
+			Tracker g2{};
+			Observation sw{};
+			sw.weaponDrawn = true;
+			sw.nowMs = 0;
+			(void)Next(g2, sw);
+			sw.weaponDrawn = false;
+			sw.occupiesStance = true;
+			sw.sitState = kSitNormal;
+			sw.nowMs = 100;
+			(void)Next(g2, sw);
+			sw.nowMs = 100 + kNormalOccupiedGraceMs;
+			Check(Next(g2, sw) == Action::kAbortNormalOccupied, "PC1.2: occupied+kNormal still fails closed (no reactivation) during the gate");
+			Check(Name(Action::kReady) == "ready" && Name(Action::kReadyCapped) == "ready-capped" && kSheatheFloorMs < kReadyCapMs &&
+					kReadyCapMs + kNormalOccupiedGraceMs + 600 < 4000,
+				"PC1.2: names; floor inside the cap; cap + grace inside the 4 s acquisition window");
+		}
 		Check(SitName(3) == "kIsSitting" && SitName(0) == "kNormal" && Name(Action::kPlace) == "place-on-datum", "names");
 		Check(static_cast<int>(Phase::kPlace) == static_cast<int>(WS::StatePolicy::AcqPhase::kPlace) &&
 				static_cast<int>(Phase::kVerifySeat) == static_cast<int>(WS::StatePolicy::AcqPhase::kVerifySeat),

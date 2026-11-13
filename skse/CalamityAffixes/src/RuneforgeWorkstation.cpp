@@ -109,6 +109,7 @@ namespace CalamityAffixes::RuneforgeWorkstation
 		static_assert(SeatP::kSitNormal == static_cast<std::uint32_t>(RE::SIT_SLEEP_STATE::kNormal) &&
 					  SeatP::kSitIsSitting == static_cast<std::uint32_t>(RE::SIT_SLEEP_STATE::kIsSitting),
 			"SeatPolicy sit states must mirror RE::SIT_SLEEP_STATE");
+		static_assert(SeatP::kWeaponSheathed == static_cast<std::uint32_t>(RE::WEAPON_STATE::kSheathed), "SeatPolicy weapon state must mirror RE::WEAPON_STATE");
 		static_assert(CP::kMovement == static_cast<std::uint32_t>(UEFlag::kMovement) && CP::kLooking == static_cast<std::uint32_t>(UEFlag::kLooking) &&
 					  CP::kActivate == static_cast<std::uint32_t>(UEFlag::kActivate) && CP::kMenu == static_cast<std::uint32_t>(UEFlag::kMenu) &&
 					  CP::kConsole == static_cast<std::uint32_t>(UEFlag::kConsole) && CP::kInvalid == static_cast<std::uint32_t>(UEFlag::kInvalid),
@@ -344,6 +345,11 @@ namespace CalamityAffixes::RuneforgeWorkstation
 			std::int64_t seatEnterMs{ 0 };
 			std::int64_t seatStatusMs{ 0 };
 			bool seatForcedThirdPerson{ false };
+			// PC1.2 follower instrumentation: player teammates before the placement, compared once afterwards
+			std::vector<std::pair<RE::FormID, RE::NiPoint3>> followerSnap;
+			std::int64_t followerPlaceMs{ -1 };
+			bool followerLogged{ true };
+			std::string_view inputSource{ "internal" };  // PC1.2 input instrumentation (static literals only)
 			// RC1-WS r3: asynchronous furniture-exit settlement and cross-menu ownership.
 			struct ExitSettlement
 			{
@@ -1954,6 +1960,12 @@ namespace CalamityAffixes::RuneforgeWorkstation
 			return geo;
 		}
 
+		int CameraStateId()
+		{
+			auto* camera = RE::PlayerCamera::GetSingleton();
+			return camera && camera->currentState ? static_cast<int>(camera->currentState->id) : -1;
+		}
+
 		SeatP::Observation ObserveSeat(RE::PlayerCharacter* a_player, RE::TESObjectREFR* a_stance, bool a_checkOthers, std::string* a_occupied, SeatGeometry* a_geo = nullptr)
 		{
 			SeatP::Observation o{};
@@ -1964,8 +1976,15 @@ namespace CalamityAffixes::RuneforgeWorkstation
 			const auto* state = a_player->AsActorState();
 			o.sitState = state ? static_cast<std::uint32_t>(state->GetSitSleepState()) : 0u;
 			o.weaponDrawn = state && state->IsWeaponDrawn();
+			o.weaponState = state ? static_cast<std::uint32_t>(state->GetWeaponState()) : SeatP::kWeaponSheathed;
+			bool equipping = false;
+			bool unequipping = false;
+			a_player->GetGraphVariableBool("IsEquipping", equipping);
+			a_player->GetGraphVariableBool("IsUnequipping", unequipping);
+			o.graphEquipBusy = equipping || unequipping;
 			auto* camera = RE::PlayerCamera::GetSingleton();
 			o.firstPerson = camera && camera->IsInFirstPerson();
+			o.thirdPersonActive = camera && camera->currentState && camera->currentState->id == RE::CameraState::kThirdPerson;
 			const auto geo = MeasureSeat(a_player, a_stance);
 			o.planarToDatum = geo.planar;
 			o.verticalToDatum = geo.vertical;
@@ -1988,11 +2007,45 @@ namespace CalamityAffixes::RuneforgeWorkstation
 			SKSE::log::info(
 				"[FEASR-RF] WS SEAT {} t={}ms phase={} expected={} occupied={} sit={}({}) slabLocal=({:.1f},{:.1f},{:.1f}) heading={:.1f} datumPlanar={:.1f} "
 				"datumDz={:.1f} headingErr={:.1f} moved={:.1f} onDatum={} places={} attempts={} weaponDrawn={} sneaking={} mounted={} inCombat={} firstPerson={} "
-				"distance={:.1f} otherOccupant={} state={}",
+				"distance={:.1f} otherOccupant={} state={} weaponState={} equipBusy={} thirdPersonActive={} cameraState={}",
 				a_what, a_o.nowMs - g.seatEnterMs, SeatP::Name(g.seat.phase), RefText(stance), a_occupied, SeatP::SitName(a_o.sitState), a_o.sitState,
 				geo.slabLocal.x, geo.slabLocal.y, geo.slabLocal.z, geo.headingDeg, a_o.planarToDatum, a_o.verticalToDatum, a_o.headingErrorDeg,
 				a_o.movedSinceLastPoll, SeatP::OnDatum(a_o), g.seat.placeAttempts, g.seat.attempts, a_o.weaponDrawn, player && player->IsSneaking(),
-				player && player->IsOnMount(), player && player->IsInCombat(), a_o.firstPerson, geo.distance, a_o.stanceOccupiedByOther, SP::Name(g.session.state));
+				player && player->IsOnMount(), player && player->IsInCombat(), a_o.firstPerson, geo.distance, a_o.stanceOccupiedByOther, SP::Name(g.session.state),
+				a_o.weaponState, a_o.graphEquipBusy, a_o.thirdPersonActive, CameraStateId());
+		}
+
+		// PC1.2: player teammates (followers) in the high process; instrumentation only
+		std::vector<std::pair<RE::FormID, RE::NiPoint3>> SnapshotFollowers()
+		{
+			std::vector<std::pair<RE::FormID, RE::NiPoint3>> out;
+			auto* player = RE::PlayerCharacter::GetSingleton();
+			auto* processLists = RE::ProcessLists::GetSingleton();
+			if (!player || !processLists) return out;
+			for (auto& handle : processLists->highActorHandles) {
+				auto actor = handle.get();
+				if (!actor || actor.get() == player || !actor->IsPlayerTeammate()) continue;
+				out.emplace_back(actor->GetFormID(), actor->GetPosition());
+				if (out.size() >= 8) break;
+			}
+			return out;
+		}
+
+		void LogFollowersAfterPlace(std::int64_t a_nowMs)
+		{
+			g.followerLogged = true;
+			auto* player = RE::PlayerCharacter::GetSingleton();
+			const auto after = SnapshotFollowers();
+			std::string text;
+			float maxMoved = 0.0f;
+			for (const auto& [id, before] : g.followerSnap) {
+				const auto it = std::find_if(after.begin(), after.end(), [&](const auto& a) { return a.first == id; });
+				const float moved = it != after.end() ? it->second.GetDistance(before) : -1.0f;
+				if (moved > maxMoved) maxMoved = moved;
+				text += fmt::format(" {:08X}:moved={:.1f}{}", id, moved, it == after.end() ? "(gone)" : "");
+			}
+			SKSE::log::info("[FEASR-RF] WS FOLLOW post-place dtMs={} before={} after={} maxMoved={:.1f}{} playerCell={:08X}", a_nowMs - g.followerPlaceMs,
+				g.followerSnap.size(), after.size(), maxMoved, text, player && player->GetParentCell() ? player->GetParentCell()->GetFormID() : 0u);
 		}
 
 		// kStanceEnter: the acquisition starts; Tick polls it every frame (SeatPolicy) until SEATED or the bounded window ends.
@@ -2005,6 +2058,9 @@ namespace CalamityAffixes::RuneforgeWorkstation
 			g.seatEnterMs = NowMs();
 			g.seatStatusMs = 0;
 			g.seatForcedThirdPerson = false;
+			g.followerSnap.clear();
+			g.followerPlaceMs = -1;
+			g.followerLogged = true;
 			auto* player = RE::PlayerCharacter::GetSingleton();
 			auto* stance = StanceRef();
 			if (!player || !stance) {
@@ -2027,6 +2083,8 @@ namespace CalamityAffixes::RuneforgeWorkstation
 			std::string occupied;
 			const auto o = ObserveSeat(player, stance, entering, &occupied);
 			const auto action = SeatP::Next(g.seat, o);
+			if (!g.followerLogged && (o.nowMs - g.followerPlaceMs >= 400 || action == SeatP::Action::kReportSeated || action == SeatP::Action::kAbortNormalOccupied))
+				LogFollowersAfterPlace(o.nowMs);
 			// PRES-D33: the acquisition phase goes to the state machine (kAcq) before the action it leads to
 			if (entering && g.seat.phase != g.seatPhaseReported) {
 				g.seatPhaseReported = g.seat.phase;
@@ -2049,7 +2107,19 @@ namespace CalamityAffixes::RuneforgeWorkstation
 				player->DrawWeaponMagicHands(false);
 				LogSeat("action=sheathe", o, occupied);
 				return;
+			case SeatP::Action::kReady:
+			case SeatP::Action::kReadyCapped:
+				LogSeat(fmt::format("readiness verdict={} sinceRequestMs={} sheatheRequested={} thirdPersonForced={}", SeatP::Name(action),
+							o.nowMs - g.seat.transitionRequestedMs, g.seat.sheatheRequested, g.seat.thirdPersonForced),
+					o, occupied);
+				return;
 			case SeatP::Action::kPlace:
+				if (g.followerPlaceMs < 0) {
+					g.followerSnap = SnapshotFollowers();
+					g.followerPlaceMs = o.nowMs;
+					g.followerLogged = false;
+					SKSE::log::info("[FEASR-RF] WS FOLLOW pre-place teammates={}", g.followerSnap.size());
+				}
 				// the datum is the stance ref transform: MoveTo passes its position and angle to the engine's MoveTo_Impl
 				player->MoveTo(stance);
 				LogSeat(fmt::format("action=place-on-datum attempt={}", g.seat.placeAttempts), o, occupied);
@@ -3037,6 +3107,12 @@ namespace CalamityAffixes::RuneforgeWorkstation
 
 		void Command(IP::Command a_command, SP::Cause a_emergencyCause = SP::Cause::kEmergency)
 		{
+			// PC1.2: the caller tags its source in g.inputSource just before the call (the call sites stay unchanged)
+			const std::string_view source = std::exchange(g.inputSource, std::string_view{ "internal" });
+			if (a_command == IP::Command::kBack || a_command == IP::Command::kSkip || a_command == IP::Command::kEmergency) {
+				SKSE::log::info("[FEASR-RF] WS INPUT command={} source={} state={} seated={}", IP::Name(a_command), source, SP::Name(g.session.state),
+					g.session.seated);
+			}
 			switch (a_command) {
 			case IP::Command::kNavUp: Navigate(-1, g.session.state == SP::State::kSelectFormula); break;
 			case IP::Command::kNavDown: Navigate(1, g.session.state == SP::State::kSelectFormula); break;
@@ -3312,6 +3388,7 @@ namespace CalamityAffixes::RuneforgeWorkstation
 					if (which == IP::Button::kOther) continue;
 					const auto phase = button->IsDown() ? IP::Phase::kDown : (button->IsUp() ? IP::Phase::kUp : IP::Phase::kHeld);
 					const auto decision = IP::Map(g.session.state, which, phase, button->HeldDuration(), g.tracker);
+					g.inputSource = device == RE::INPUT_DEVICE::kGamepad ? "gamepad" : "keyboard";
 					Command(decision.command, which == IP::Button::kF10 ? SP::Cause::kF10 : SP::Cause::kEmergency);
 					consumed = consumed || decision.consume;
 				}
@@ -3568,6 +3645,7 @@ namespace CalamityAffixes::RuneforgeWorkstation
 			} else if (command == "accept") {
 				Command(state == SP::State::kPerforming ? IP::Command::kSkip : IP::Command::kAccept);
 			} else if (command == "back") {
+				g.inputSource = "ui-click";
 				Command(state == SP::State::kPerforming ? IP::Command::kSkip : IP::Command::kBack);
 			} else if (command == "holdBegin" && state == SP::State::kConfirm) {
 				Command(IP::Command::kHoldBegin);

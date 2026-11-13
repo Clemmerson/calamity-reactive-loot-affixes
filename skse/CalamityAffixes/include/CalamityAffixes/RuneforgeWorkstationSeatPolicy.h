@@ -40,6 +40,23 @@ namespace CalamityAffixes::RuneforgeWorkstation::SeatPolicy
 	// RE::SIT_SLEEP_STATE (include/RE/A/ActorState.h); static_asserted against CommonLib in the game build.
 	inline constexpr std::uint32_t kSitNormal = 0;
 	inline constexpr std::uint32_t kSitIsSitting = 3;
+	// RE::WEAPON_STATE kSheathed (include/RE/A/ActorState.h); static_asserted against CommonLib in the game build.
+	inline constexpr std::uint32_t kWeaponSheathed = 0;
+	// PC1.2 readiness gate (2026-11-10). Evidence: every activation that started with a drawn weapon failed (4/4: two
+	// first-person, two third-person) and every one without a weapon seated (23/23, eight first-person). The engine's
+	// weapon-state flag read "sheathed" 11-17 ms after DrawWeaponMagicHands(false), the placement followed at once while the
+	// sheathe animation still ran, the furniture was taken (occupied) but the sit never started (kNormal; no OnSit), and the
+	// session ended ABORT_STANCE_FAILED after the grace window. The forced camera switch alone never failed (8/8).
+	// After a requested camera switch or sheathe, PLACE waits until the change is OBSERVED complete: not first person, the
+	// camera's own state is third person, the weapon state is kSheathed, the behaviour graph is not equipping/unequipping,
+	// and (after a sheathe only) kSheatheFloorMs has passed since the request because the weapon-state flag was proven to run
+	// ahead of the animation. Two quiet polls kReadyPollSpacingMs apart. Bounded: past kReadyCapMs the acquisition proceeds as
+	// before (the StatePolicy acquisition window and the kNormal fail-closed abort still apply), so a camera mod that keeps a
+	// custom camera state can never stall entry.
+	inline constexpr std::int64_t kSheatheFloorMs = 900;
+	inline constexpr std::int64_t kReadyPollSpacingMs = 50;
+	inline constexpr std::uint32_t kReadyPolls = 2;
+	inline constexpr std::int64_t kReadyCapMs = 2000;
 
 	struct Observation
 	{
@@ -54,7 +71,17 @@ namespace CalamityAffixes::RuneforgeWorkstation::SeatPolicy
 		float movedSinceLastPoll{ 0.0f };  // how far the player moved since the previous poll
 		bool player3DLoaded{ true };
 		bool stanceOccupiedByOther{ false };
+		// PC1.2 readiness observations (defaults describe a settled third-person player with nothing in transition)
+		std::uint32_t weaponState{ kWeaponSheathed };  // raw RE::WEAPON_STATE
+		bool graphEquipBusy{ false };                  // behaviour graph IsEquipping || IsUnequipping
+		bool thirdPersonActive{ true };                // PlayerCamera currentState is the third-person state
 	};
+
+	// The camera switch / sheathe this acquisition requested has been observed complete (never assumed from the request).
+	[[nodiscard]] constexpr bool TransitionQuiet(const Observation& a_obs) noexcept
+	{
+		return !a_obs.firstPerson && a_obs.thirdPersonActive && !a_obs.weaponDrawn && a_obs.weaponState == kWeaponSheathed && !a_obs.graphEquipBusy;
+	}
 
 	// The acquisition phase; the values mirror StatePolicy::AcqPhase kPlace..kVerifySeat (1..4).
 	enum class Phase : std::uint8_t
@@ -74,7 +101,9 @@ namespace CalamityAffixes::RuneforgeWorkstation::SeatPolicy
 		kActivate,
 		kReportSeated,      // dispatch SEATED 1 (once)
 		kReportUnseated,    // the seat was verified and is gone again: dispatch SEATED 0 (once)
-		kAbortNormalOccupied // exact stance remains occupied with kNormal beyond the grace window; fail closed
+		kAbortNormalOccupied, // exact stance remains occupied with kNormal beyond the grace window; fail closed
+		kReady,             // PC1.2: the requested camera switch / sheathe is observed complete (log only; placement follows)
+		kReadyCapped        // PC1.2: readiness not observed within kReadyCapMs; proceed as before (log only)
 	};
 
 	struct Tracker
@@ -95,6 +124,12 @@ namespace CalamityAffixes::RuneforgeWorkstation::SeatPolicy
 		std::int64_t unseatedSinceMs{ -1 };
 		bool reported{ false };   // SEATED 1 dispatched
 		std::uint32_t polls{ 0 };
+		// PC1.2 readiness gate
+		std::int64_t transitionRequestedMs{ -1 };  // last camera-switch / sheathe request
+		std::int64_t sheatheRequestedMs{ -1 };
+		bool ready{ false };
+		std::uint32_t readyPolls{ 0 };
+		std::int64_t lastReadyPollMs{ 0 };
 	};
 
 	[[nodiscard]] constexpr float Abs(float a_value) noexcept
@@ -160,14 +195,42 @@ namespace CalamityAffixes::RuneforgeWorkstation::SeatPolicy
 		if (a_obs.sitState != kSitNormal) return Action::kNone;
 		if (a_obs.firstPerson && !a_t.thirdPersonForced) {
 			a_t.thirdPersonForced = true;
+			a_t.transitionRequestedMs = a_obs.nowMs;
+			a_t.ready = false;
+			a_t.readyPolls = 0;
 			return Action::kForceThirdPerson;
 		}
 		if (a_obs.weaponDrawn) {
 			if (!a_t.sheatheRequested) {
 				a_t.sheatheRequested = true;
+				a_t.transitionRequestedMs = a_obs.nowMs;
+				a_t.sheatheRequestedMs = a_obs.nowMs;
+				a_t.ready = false;
+				a_t.readyPolls = 0;
 				return Action::kSheathe;
 			}
 			return Action::kNone;  // wait for the sheathe animation
+		}
+		// PC1.2: a requested camera switch or sheathe must be observed complete before the player is placed
+		if (a_t.transitionRequestedMs >= 0 && !a_t.ready) {
+			const bool floorMet = a_t.sheatheRequestedMs < 0 || a_obs.nowMs - a_t.sheatheRequestedMs >= kSheatheFloorMs;
+			if (TransitionQuiet(a_obs) && floorMet) {
+				if (a_t.readyPolls == 0 || a_obs.nowMs - a_t.lastReadyPollMs >= kReadyPollSpacingMs) {
+					a_t.readyPolls += 1;
+					a_t.lastReadyPollMs = a_obs.nowMs;
+				}
+				if (a_t.readyPolls >= kReadyPolls) {
+					a_t.ready = true;
+					return Action::kReady;
+				}
+			} else {
+				a_t.readyPolls = 0;
+			}
+			if (a_obs.nowMs - a_t.transitionRequestedMs >= kReadyCapMs) {
+				a_t.ready = true;
+				return Action::kReadyCapped;
+			}
+			return Action::kNone;
 		}
 		const bool on = OnDatum(a_obs);
 		switch (a_t.phase) {
@@ -240,6 +303,8 @@ namespace CalamityAffixes::RuneforgeWorkstation::SeatPolicy
 		case Action::kReportSeated: return "seated";
 		case Action::kReportUnseated: return "unseated";
 		case Action::kAbortNormalOccupied: return "abort-occupied-normal";
+		case Action::kReady: return "ready";
+		case Action::kReadyCapped: return "ready-capped";
 		}
 		return "?";
 	}
