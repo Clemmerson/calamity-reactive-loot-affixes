@@ -4,17 +4,42 @@
 				return {};
 			}
 
-			if (a_keyCode >= kMouseButtonOffset) {
+			if (a_keyCode >= kMouseButtonOffset && a_keyCode <= kMouseButtonOffset + 9u) {
 				const auto mouse = a_keyCode - kMouseButtonOffset;
 				switch (mouse) {
-				case 0:
-					return "Mouse1";
-				case 1:
-					return "Mouse2";
-				case 2:
-					return "Mouse3";
-				default:
-					return "Mouse" + std::to_string(mouse + 1);
+				case 0: return "Mouse Left";
+				case 1: return "Mouse Right";
+				case 2: return "Mouse Middle";
+				case 3: return "Mouse 4";
+				case 4: return "Mouse 5";
+				case 5: return "Mouse 6";
+				case 6: return "Mouse 7";
+				case 7: return "Mouse 8";
+				case 8: return "Wheel Up";
+				case 9: return "Wheel Down";
+				default: break;
+				}
+			}
+
+			if (a_keyCode >= 266u && a_keyCode <= 281u) {
+				switch (a_keyCode) {
+				case 266u: return "Gamepad D-Pad Up";
+				case 267u: return "Gamepad D-Pad Down";
+				case 268u: return "Gamepad D-Pad Left";
+				case 269u: return "Gamepad D-Pad Right";
+				case 270u: return "Gamepad Start";
+				case 271u: return "Gamepad Back";
+				case 272u: return "Gamepad Left Stick";
+				case 273u: return "Gamepad Right Stick";
+				case 274u: return "Gamepad LB";
+				case 275u: return "Gamepad RB";
+				case 276u: return "Gamepad A";
+				case 277u: return "Gamepad B";
+				case 278u: return "Gamepad X";
+				case 279u: return "Gamepad Y";
+				case 280u: return "Gamepad LT";
+				case 281u: return "Gamepad RT";
+				default: break;
 				}
 			}
 
@@ -157,7 +182,7 @@
 				break;
 			}
 
-			return "Key" + std::to_string(a_keyCode);
+			return "Input " + std::to_string(a_keyCode);
 		}
 
 		[[nodiscard]] bool ShouldThrottleSettingsRefresh(

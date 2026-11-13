@@ -1,6 +1,7 @@
 #include "CalamityAffixes/EventBridge.h"
 #include "CalamityAffixes/LootUiGuards.h"
 #include "CalamityAffixes/ProcChancePolicy.h"
+#include "CalamityAffixes/RunewordEffectDetailPolicy.h"
 #include "EventBridge.Loot.Runeword.SummaryText.h"
 
 #include <algorithm>
@@ -154,7 +155,8 @@ namespace CalamityAffixes
 			this,
 			a_uiLanguageMode,
 			itemType
-		](const AffixRuntime& a_affix, std::size_t a_affixIndex, const TooltipCandidate& a_candidate) -> std::string {
+		](const AffixRuntime& a_affix, std::size_t a_affixIndex, const TooltipCandidate& a_candidate,
+			bool a_includeRunewordSummary = true) -> std::string {
 			std::string detail;
 			const auto* state = FindInstanceRuntimeState(a_candidate.instanceKey, a_affix.token);
 			const auto& action = a_affix.action;
@@ -402,6 +404,13 @@ namespace CalamityAffixes
 					headerEn.append(formatNumberCompact(durationSec));
 					headerEn.append("s)");
 				}
+				// Quoted spell record names carry the upstream recipe name.
+				if (const auto* autoRecipe = FindRunewordRecipeByResultAffixToken(a_autoAffix.token)) {
+					headerEn = RuneforgePresentation::PresentRunewordRecordText(
+						headerEn,
+						autoRecipe->id,
+						autoRecipe->displayNameEn);
+				}
 
 				std::string headerKo;
 				headerKo.append(triggerTextKo(a_autoAffix.trigger));
@@ -447,64 +456,95 @@ namespace CalamityAffixes
 				}
 			};
 
-			const auto autoSummary = buildRunewordAutoSummary(a_affix);
-			if (!autoSummary.empty()) {
+			if (a_includeRunewordSummary) {
+				const auto autoSummary = buildRunewordAutoSummary(a_affix);
+				if (!autoSummary.empty()) {
+					if (!detail.empty()) {
+						detail.push_back('\n');
+					}
+					detail.append(autoSummary);
+				}
+			}
+
+			auto appendSpellEffectProfile = [&](std::string_view a_prefix, RE::SpellItem* a_spell) {
+				if (!a_spell) {
+					return;
+				}
+				using RunewordEffectDetailPolicy::SpellEffect;
+				std::vector<SpellEffect> effects;
+				effects.reserve(3u);
+				std::size_t totalEffectCount = 0u;
+				for (const auto* effect : a_spell->effects) {
+					if (!effect || !effect->baseEffect) {
+						continue;
+					}
+					++totalEffectCount;
+					if (effects.size() >= 3u) {
+						continue;
+					}
+					const char* rawName = effect->baseEffect->GetName();
+					const auto fallback = rawName && rawName[0] != '\0' ? std::string(rawName) : std::string("Effect");
+					effects.push_back(SpellEffect{
+						.name = ResolveRecordDisplayName(effect->baseEffect, fallback, a_uiLanguageMode == 1),
+						.magnitude = effect->effectItem.magnitude,
+						.durationSeconds = effect->effectItem.duration,
+						.area = effect->effectItem.area
+					});
+				}
+				auto profile = RunewordEffectDetailPolicy::FormatSpellEffects(
+					effects, totalEffectCount, a_uiLanguageMode == 1);
+				if (profile.empty()) {
+					return;
+				}
 				if (!detail.empty()) {
 					detail.push_back('\n');
 				}
-				detail.append(autoSummary);
+				if (!a_prefix.empty()) {
+					detail.append(a_prefix);
+					detail.append(":\n");
+				}
+				detail.append(profile);
+			};
+
+			if (FindRunewordRecipeByResultAffixToken(a_affix.token)) {
+				switch (action.type) {
+				case ActionType::kCastSpell:
+				case ActionType::kCastOnCrit:
+				case ActionType::kConvertDamage:
+				case ActionType::kArchmage:
+				case ActionType::kSpawnTrap:
+				case ActionType::kCorpseExplosion:
+				case ActionType::kSummonCorpseExplosion:
+					appendSpellEffectProfile(a_uiLanguageMode == 1 ? "주문 효과" : "Spell effects", action.spell);
+					break;
+				case ActionType::kCastSpellAdaptiveElement:
+					if (action.adaptiveFire) appendSpellEffectProfile(a_uiLanguageMode == 1 ? "화염" : "Fire", action.adaptiveFire);
+					if (action.adaptiveFrost) appendSpellEffectProfile(a_uiLanguageMode == 1 ? "냉기" : "Frost", action.adaptiveFrost);
+					if (action.adaptiveShock) appendSpellEffectProfile(a_uiLanguageMode == 1 ? "전격" : "Shock", action.adaptiveShock);
+					break;
+				case ActionType::kEchoStrike:
+					detail.append(a_uiLanguageMode == 1 ?
+						("그림자 타격 재시전: " + std::to_string(action.echoDelay.count() / 1000) + "초 뒤") :
+						("Shadow echo repeats after " + formatNumberCompact(static_cast<float>(action.echoDelay.count()) / 1000.0f) + "s"));
+					break;
+				default:
+					break;
+				}
+				if (a_affix.passiveSpell && a_affix.passiveSpell != action.spell) {
+					appendSpellEffectProfile(a_uiLanguageMode == 1 ? "상시 효과" : "Passive effects", a_affix.passiveSpell);
+				}
 			}
 
-			const bool usesStandardTriggerProcLane =
-				a_affix.action.type == ActionType::kCastSpell ||
-				a_affix.action.type == ActionType::kCastSpellAdaptiveElement ||
-				a_affix.action.type == ActionType::kSpawnTrap;
-			const bool usesSpecialProcLane =
-				a_affix.action.type == ActionType::kCastOnCrit ||
-				a_affix.action.type == ActionType::kConvertDamage ||
-				a_affix.action.type == ActionType::kMindOverMatter ||
-				a_affix.action.type == ActionType::kArchmage ||
-				a_affix.action.type == ActionType::kCorpseExplosion ||
-				a_affix.action.type == ActionType::kSummonCorpseExplosion;
-			if ((usesStandardTriggerProcLane || usesSpecialProcLane) &&
-				a_affix.procChancePct > 0.0f &&
-				a_affix.luckyHitChancePct <= 0.0f &&
-				a_affix.slot != AffixSlot::kSuffix) {
-				bool exactInstanceCached = false;
-				if (const auto equippedIt = _instanceTrackingState.equippedInstanceKeysByToken.find(a_affix.token);
-					equippedIt != _instanceTrackingState.equippedInstanceKeysByToken.end()) {
-					exactInstanceCached = std::find(
-						equippedIt->second.begin(),
-						equippedIt->second.end(),
-						a_candidate.instanceKey) != equippedIt->second.end();
-				}
-
-				const bool affixActive =
-					a_affixIndex < _affixRuntimeState.activeCounts.size() &&
-					_affixRuntimeState.activeCounts[a_affixIndex] > 0u;
-				const auto displayMode = ResolveProcChanceDisplayMode(
-					_runtimeSettings.enabled.load(std::memory_order_relaxed),
-					a_candidate.worn,
-					_instanceTrackingState.equippedTokenCacheReady,
-					exactInstanceCached,
-					affixActive);
-
-				const bool useCurrentChance = displayMode == ProcChanceDisplayMode::kCurrent;
-				const float currentTriggerChance = useCurrentChance && usesStandardTriggerProcLane ?
-					ResolveTriggerProcChancePct(a_affix, a_affixIndex) :
-					0.0f;
-				const float effectiveChance = ResolveDisplayedProcChancePct(
-					displayMode,
-					usesStandardTriggerProcLane,
-					a_affix.procChancePct,
-					_runtimeSettings.procChanceMult,
-					ResolveMultiAffixProcPenalty(CountProcPenaltySlots(a_candidate.slots)),
-					currentTriggerChance);
-
-				const bool inactive = displayMode == ProcChanceDisplayMode::kInactive;
-				if (inactive || ShouldShowAdjustedProcChance(a_affix.procChancePct, effectiveChance)) {
-					const auto baseText = formatNumberCompact(std::clamp(a_affix.procChancePct, 0.0f, 100.0f));
-					const auto effectiveText = formatNumberCompact(effectiveChance);
+			// R8.7.4.21 I3: the chance numbers come from ResolveInstanceProcChanceContext (shared with the Runeword effect
+			// card); the wording below is unchanged.
+			if (const auto chance = ResolveInstanceProcChanceContext(
+					a_affix, a_affixIndex, a_candidate.instanceKey, a_candidate.slots, a_candidate.worn);
+				chance.mode != RunewordEffectCardPolicy::ChanceMode::kNone) {
+				const bool useCurrentChance = chance.mode == RunewordEffectCardPolicy::ChanceMode::kCurrent;
+				const bool inactive = chance.mode == RunewordEffectCardPolicy::ChanceMode::kInactive;
+				{
+					const auto baseText = formatNumberCompact(std::clamp(chance.basePct, 0.0f, 100.0f));
+					const auto effectiveText = formatNumberCompact(chance.effectivePct);
 					const std::string chanceEn = inactive ?
 						("Currently inactive (base proc chance " + baseText + "%)") :
 						(useCurrentChance ?
@@ -538,20 +578,25 @@ namespace CalamityAffixes
 		};
 
 		auto resolveDisplayName = [&](const AffixRuntime& a_affix) -> std::string {
+			// English halves go through the FE-ASR presentation boundary (Runeword
+			// result affixes); every other affix resolves to its upstream name.
 			switch (a_uiLanguageMode) {
 			case 0:
-				return a_affix.displayNameEn;
+				return ResolveAffixDisplayNameEn(a_affix);
 			case 1:
 				return a_affix.displayNameKo;
 			case 2:
 			default:
-				if (a_affix.displayNameKo == a_affix.displayNameEn || a_affix.displayNameEn.empty()) {
-					return a_affix.displayNameKo;
+				{
+					const auto nameEn = ResolveAffixDisplayNameEn(a_affix);
+					if (a_affix.displayNameKo == nameEn || nameEn.empty()) {
+						return a_affix.displayNameKo;
+					}
+					if (a_affix.displayNameKo.empty()) {
+						return nameEn;
+					}
+					return a_affix.displayNameKo + " / " + nameEn;
 				}
-				if (a_affix.displayNameKo.empty()) {
-					return a_affix.displayNameEn;
-				}
-				return a_affix.displayNameKo + " / " + a_affix.displayNameEn;
 			}
 		};
 
@@ -576,6 +621,25 @@ namespace CalamityAffixes
 				}
 
 				const auto& affix = _affixRuntimeState.affixes[idxIt->second];
+				if (a_uiLanguageMode == 0) {
+					if (const auto* recipe = FindRunewordRecipeByResultAffixToken(affix.token)) {
+						(void)recipe;
+						// R8.7.4.21 I3: RunewordEffectCard v1 from the resolved runtime data (no record names, no
+						// text-parsed upstream stats), plus this instance's effective proc chance (DD-B5-3).
+						auto cardInput = BuildRunewordEffectCardInput(affix, *recipe);
+						cardInput.chance = ResolveInstanceProcChanceContext(
+							affix, idxIt->second, a_candidate.instanceKey, a_candidate.slots, a_candidate.worn);
+						auto compactRuneword = RunewordEffectCardPolicy::TooltipText(RunewordEffectCardPolicy::Build(cardInput));
+						if (!compactRuneword.empty()) {
+							if (!tooltip.empty() && tooltip.back() != '\n') {
+								tooltip.push_back('\n');
+							}
+							tooltip.append(compactRuneword);
+							continue;
+						}
+					}
+				}
+
 				auto resolvedName = resolveDisplayName(affix);
 				if (resolvedName.empty()) {
 					continue;
@@ -660,5 +724,114 @@ namespace CalamityAffixes
 			return std::nullopt;
 		}
 		return fallback;
+	}
+
+	RunewordEffectCardPolicy::ChanceContext EventBridge::ResolveInstanceProcChanceContext(
+		const AffixRuntime& a_affix,
+		std::size_t a_affixIndex,
+		std::uint64_t a_instanceKey,
+		const InstanceAffixSlots& a_slots,
+		bool a_worn) const
+	{
+		RunewordEffectCardPolicy::ChanceContext out{};
+		const bool usesStandardTriggerProcLane =
+			a_affix.action.type == ActionType::kCastSpell ||
+			a_affix.action.type == ActionType::kCastSpellAdaptiveElement ||
+			a_affix.action.type == ActionType::kSpawnTrap;
+		const bool usesSpecialProcLane =
+			a_affix.action.type == ActionType::kCastOnCrit ||
+			a_affix.action.type == ActionType::kConvertDamage ||
+			a_affix.action.type == ActionType::kMindOverMatter ||
+			a_affix.action.type == ActionType::kArchmage ||
+			a_affix.action.type == ActionType::kCorpseExplosion ||
+			a_affix.action.type == ActionType::kSummonCorpseExplosion;
+		if (!(usesStandardTriggerProcLane || usesSpecialProcLane) ||
+			a_affix.procChancePct <= 0.0f ||
+			a_affix.luckyHitChancePct > 0.0f ||
+			a_affix.slot == AffixSlot::kSuffix) {
+			return out;
+		}
+		bool exactInstanceCached = false;
+		if (const auto equippedIt = _instanceTrackingState.equippedInstanceKeysByToken.find(a_affix.token);
+			equippedIt != _instanceTrackingState.equippedInstanceKeysByToken.end()) {
+			exactInstanceCached = std::find(
+				equippedIt->second.begin(),
+				equippedIt->second.end(),
+				a_instanceKey) != equippedIt->second.end();
+		}
+
+		const bool affixActive =
+			a_affixIndex < _affixRuntimeState.activeCounts.size() &&
+			_affixRuntimeState.activeCounts[a_affixIndex] > 0u;
+		const auto displayMode = ResolveProcChanceDisplayMode(
+			_runtimeSettings.enabled.load(std::memory_order_relaxed),
+			a_worn,
+			_instanceTrackingState.equippedTokenCacheReady,
+			exactInstanceCached,
+			affixActive);
+
+		const bool useCurrentChance = displayMode == ProcChanceDisplayMode::kCurrent;
+		const float currentTriggerChance = useCurrentChance && usesStandardTriggerProcLane ?
+			ResolveTriggerProcChancePct(a_affix, a_affixIndex) :
+			0.0f;
+		const float effectiveChance = ResolveDisplayedProcChancePct(
+			displayMode,
+			usesStandardTriggerProcLane,
+			a_affix.procChancePct,
+			_runtimeSettings.procChanceMult,
+			ResolveMultiAffixProcPenalty(CountProcPenaltySlots(a_slots)),
+			currentTriggerChance);
+
+		const bool inactive = displayMode == ProcChanceDisplayMode::kInactive;
+		if (!inactive && !ShouldShowAdjustedProcChance(a_affix.procChancePct, effectiveChance)) {
+			return out;
+		}
+		out.mode = inactive ? RunewordEffectCardPolicy::ChanceMode::kInactive :
+		           (useCurrentChance ? RunewordEffectCardPolicy::ChanceMode::kCurrent :
+		                               RunewordEffectCardPolicy::ChanceMode::kIfEquippedAlone);
+		out.basePct = a_affix.procChancePct;
+		out.effectivePct = effectiveChance;
+		return out;
+	}
+
+	std::optional<RunewordEffectCardPolicy::Card> EventBridge::GetInstanceRunewordEffectCard(
+		std::uint64_t a_instanceKey,
+		bool a_worn)
+	{
+		const std::scoped_lock lock(_stateMutex);
+		if (!_configLoaded || a_instanceKey == 0u) {
+			return std::nullopt;
+		}
+		// The only per-instance input is the IAXF slot list (co-save record, moved by the drop/pickup key transfer);
+		// recipe/affix runtime and SpellItem records are config, rebuilt at load. Nothing of the card is persisted.
+		const auto slotsIt = _instanceTrackingState.instanceAffixes.find(a_instanceKey);
+		if (slotsIt == _instanceTrackingState.instanceAffixes.end()) {
+			return std::nullopt;
+		}
+		const auto& slots = slotsIt->second;
+		for (std::uint8_t s = 0; s < slots.count; ++s) {
+			const auto token = slots.tokens[s];
+			const auto* recipe = FindRunewordRecipeByResultAffixToken(token);
+			if (!recipe) {
+				continue;
+			}
+			const auto idxIt = _affixRuntimeState.affixRegistry.affixIndexByToken.find(token);
+			if (idxIt == _affixRuntimeState.affixRegistry.affixIndexByToken.end() || idxIt->second >= _affixRuntimeState.affixes.size()) {
+				continue;
+			}
+			const auto& affix = _affixRuntimeState.affixes[idxIt->second];
+			bool worn = a_worn;
+			if (const auto equippedIt = _instanceTrackingState.equippedInstanceKeysByToken.find(token);
+				equippedIt != _instanceTrackingState.equippedInstanceKeysByToken.end()) {
+				worn = worn || std::find(equippedIt->second.begin(), equippedIt->second.end(), a_instanceKey) != equippedIt->second.end();
+			}
+			auto input = BuildRunewordEffectCardInput(affix, *recipe);
+			input.chance = ResolveInstanceProcChanceContext(affix, idxIt->second, a_instanceKey, slots, worn);
+			auto card = RunewordEffectCardPolicy::Build(input);
+			if (card.known) {
+				return card;
+			}
+		}
+		return std::nullopt;
 	}
 }

@@ -3,6 +3,7 @@
 #include "CalamityAffixes/LootRollSelection.h"
 #include "CalamityAffixes/PluginEditorIds.h"
 #include "CalamityAffixes/ProcChancePolicy.h"
+#include "CalamityAffixes/RuneforgePresentation.h"
 #include "CalamityAffixes/RunewordUiPolicy.h"
 #include "CalamityAffixes/RunewordUtil.h"
 #include "CalamityAffixes/SpecialActionSafetyPolicy.h"
@@ -64,14 +65,14 @@ namespace CalamityAffixes
 			a_panelState.baseCompatibilityMessageEn.append(
 				detail::DescribeSpecializedRunewordBaseEn(requirement));
 			a_panelState.baseCompatibilityMessageEn.append(
-				". The selected base is incompatible; transmute remains allowed.");
+				". The selected base is incompatible; engraving is blocked.");
 
 			a_panelState.baseCompatibilityMessageKo =
 				"베이스 불일치: 이 룬워드는 ";
 			a_panelState.baseCompatibilityMessageKo.append(
 				detail::DescribeSpecializedRunewordBaseKo(requirement));
 			a_panelState.baseCompatibilityMessageKo.append(
-				"에 맞춰져 있습니다. 현재 베이스와 호환되지 않지만 변환은 계속할 수 있습니다.");
+				"에 맞춰져 있습니다. 현재 베이스와 호환되지 않아 각인할 수 없습니다.");
 		}
 	}
 
@@ -209,10 +210,19 @@ namespace CalamityAffixes
 
 			EquippedBuildEntry entry{};
 			entry.token = affix.token;
-			entry.displayNameEn = !affix.displayNameEn.empty() ? affix.displayNameEn :
+			entry.displayNameEn = !affix.displayNameEn.empty() ? ResolveAffixDisplayNameEn(affix) :
 				(!affix.displayName.empty() ? affix.displayName : affix.id);
 			entry.displayNameKo = !affix.displayNameKo.empty() ? affix.displayNameKo :
 				(!affix.displayName.empty() ? affix.displayName : affix.id);
+			if (const auto* recipe = FindRunewordRecipeByResultAffixToken(affix.token)) {
+				entry.effectSummaryEn = std::string(RuneforgePresentation::EffectSummary(recipe->id));
+			}
+			entry.cooldownSeconds = static_cast<float>(affix.icd.count()) / 1000.0f;
+			entry.perTargetCooldownSeconds = static_cast<float>(affix.perTargetIcd.count()) / 1000.0f;
+			if (affix.trigger == Trigger::kLowHealth) {
+				entry.lowHealthThresholdPct = affix.lowHealthThresholdPct;
+				entry.lowHealthRearmPct = affix.lowHealthRearmPct;
+			}
 			entry.group = detail::DescribeEquippedBuildGroup(
 				detail::ResolveEquippedBuildGroup(policyInput));
 			entry.triggerKey = detail::DescribeEquippedBuildTriggerKey(
@@ -285,7 +295,9 @@ namespace CalamityAffixes
 			std::numeric_limits<std::uint32_t>::max()));
 	}
 
-	EventBridge::RunewordPanelState EventBridge::GetRunewordPanelState()
+	EventBridge::RunewordPanelState EventBridge::GetRunewordPanelState(
+		bool a_allowUndiscoveredRecipe,
+		bool a_allowCurrentRecipeFallback)
 	{
 		const std::scoped_lock lock(_stateMutex);
 		RunewordPanelState panelState{};
@@ -357,18 +369,21 @@ namespace CalamityAffixes
 						if (nameIt == _runewordState.runeNameByToken.end()) {
 							return std::nullopt;
 						}
-						return nameIt->second;
+						// FE-ASR rune name; the internal key stays in runeNameByToken.
+						return RuneforgePresentation::RuneNameOr(nameIt->second);
 					})) {
 				panelState.runeInventoryKnown = true;
 				panelState.runeInventory = std::move(*runeInventory);
 			}
 		}
 
-		if (const auto* currentRecipe = GetCurrentRunewordRecipe()) {
-			panelState.recipeName = currentRecipe->displayName;
-			panelState.recipeNameEn = currentRecipe->displayNameEn;
-			panelState.recipeNameKo = currentRecipe->displayNameKo;
-			panelState.recipeToken = currentRecipe->token;
+		if (a_allowCurrentRecipeFallback) {
+			if (const auto* currentRecipe = GetCurrentRunewordRecipe()) {
+				panelState.recipeName = currentRecipe->displayName;
+				panelState.recipeNameEn = currentRecipe->PresentationNameEn();
+				panelState.recipeNameKo = currentRecipe->displayNameKo;
+				panelState.recipeToken = currentRecipe->token;
+			}
 		}
 		if (!_runewordState.selectedBaseKey) {
 			panelState.expandAffixUnavailableReason = "no_base";
@@ -406,6 +421,7 @@ namespace CalamityAffixes
 					}
 					continue;
 				}
+				panelState.regularAffixTokens.push_back(token);
 
 				// Legacy tokens (unknown or unslotted) still occupy a regular slot,
 				// so the panel offers Scour to reroll them. They are never
@@ -435,7 +451,7 @@ namespace CalamityAffixes
 
 				std::string nameEn = affix.displayNameEn;
 				if (nameEn.empty()) {
-					nameEn = affix.displayName.empty() ? affix.id : affix.displayName;
+					nameEn = affix.id;
 				}
 				std::string nameKo = affix.displayNameKo;
 				if (nameKo.empty()) {
@@ -496,14 +512,22 @@ namespace CalamityAffixes
 			inserted = stateIt->second.insertedRunes;
 		}
 
-		const auto* recipe = ResolveSelectedRunewordRecipe(*_runewordState.selectedBaseKey);
+		const auto* completedRecipe = ResolveCompletedRunewordRecipe(*_runewordState.selectedBaseKey);
+		const auto* recipe = ResolveSelectedRunewordRecipe(
+			*_runewordState.selectedBaseKey,
+			completedRecipe,
+			a_allowCurrentRecipeFallback);
+		if (!a_allowUndiscoveredRecipe && recipe && !completedRecipe &&
+			!_feasrKnownRunewordRecipeIds.contains(recipe->id)) {
+			recipe = nullptr;
+		}
 		if (!recipe || recipe->runeTokens.empty()) {
 			return panelState;
 		}
 
 		panelState.hasRecipe = true;
 		panelState.recipeName = recipe->displayName;
-		panelState.recipeNameEn = recipe->displayNameEn;
+		panelState.recipeNameEn = recipe->PresentationNameEn();
 		panelState.recipeNameKo = recipe->displayNameKo;
 		panelState.recipeToken = recipe->token;
 		panelState.totalRunes = static_cast<std::uint32_t>(recipe->runeTokens.size());
@@ -517,6 +541,7 @@ namespace CalamityAffixes
 				selectedXList) &&
 			selectedEntry && selectedEntry->object) {
 			PopulateSpecializedBaseWarning(panelState, recipe->id, selectedEntry->object);
+
 		}
 
 		const auto applyBlockReason = ResolveRunewordApplyBlockReason(*_runewordState.selectedBaseKey, *recipe);
@@ -556,10 +581,7 @@ namespace CalamityAffixes
 				continue;
 			}
 
-			std::string runeName = "Rune";
-			if (const auto nameIt = _runewordState.runeNameByToken.find(token); nameIt != _runewordState.runeNameByToken.end()) {
-				runeName = nameIt->second;
-			}
+			const auto runeName = ResolveRuneDisplayName(token);
 
 			const auto owned = GetOwnedRunewordFragmentCount(player, _runewordState.runeNameByToken, token);
 			panelState.requiredRunes.push_back(RunewordRuneRequirement{

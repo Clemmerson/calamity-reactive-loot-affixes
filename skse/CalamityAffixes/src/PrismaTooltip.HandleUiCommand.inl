@@ -30,6 +30,18 @@
 			}
 
 		private:
+			// RC1 legacy-UI policy (feasr-core docs/RUNEFORGE_LEGACY_UI_POLICY_20261019.md): with FEASR Runeforge active,
+			// Runeword insertion, Identify, Reforge, Add Slot and Scour run only at the Runeforge.
+			[[nodiscard]] static bool RefuseLegacyRuneforgeOperation(RuneforgeWorkstation::ContextPolicy::LegacyOperation a_operation)
+			{
+				using namespace RuneforgeWorkstation::ContextPolicy;
+				if (ResolveLegacy(a_operation, RuneforgeWorkstation::IsFeasrRuneforgeActive()) == LegacyVerdict::kAllow) {
+					return false;
+				}
+				PushUiFeedback(kUseRuneforgeMessage);
+				return true;
+			}
+
 			[[nodiscard]] static std::optional<std::uint64_t> ParseUiCommandUint64(std::string_view a_text)
 			{
 				std::uint64_t value = 0;
@@ -153,6 +165,9 @@
 			[[nodiscard]] static bool HandleImmediateRunewordCommand(std::string_view a_command)
 			{
 				if (a_command == "runeword.insert") {
+					if (RefuseLegacyRuneforgeOperation(RuneforgeWorkstation::ContextPolicy::LegacyOperation::kRunewordInsert)) {
+						return true;
+					}
 					auto* bridge = CalamityAffixes::EventBridge::GetSingleton();
 					CalamityAffixes::RunewordPanelState before{};
 					if (bridge) {
@@ -209,6 +224,9 @@
 				}
 
 				if (a_command.rfind(kAffixExpandPrefix, 0) == 0) {
+					if (RefuseLegacyRuneforgeOperation(RuneforgeWorkstation::ContextPolicy::LegacyOperation::kAddSlot)) {
+						return true;
+					}
 					const auto payload = a_command.substr(kAffixExpandPrefix.size());
 					const auto keys = CalamityAffixes::ParseAffixExpandCommandKeys(payload);
 					if (!keys) {
@@ -232,6 +250,14 @@
 				}
 
                 if (a_command.starts_with("affix.identify:") || a_command.starts_with("affix.reforge:") || a_command.starts_with("affix.scour:")) {
+                    {
+                        using RuneforgeWorkstation::ContextPolicy::LegacyOperation;
+                        const auto legacy = a_command.starts_with("affix.identify:") ? LegacyOperation::kIdentify :
+                            (a_command.starts_with("affix.reforge:") ? LegacyOperation::kReforge : LegacyOperation::kScour);
+                        if (RefuseLegacyRuneforgeOperation(legacy)) {
+                            return true;
+                        }
+                    }
                     const auto separator = a_command.find(':');
                     const auto payload = a_command.substr(separator + 1u);
                     auto action = CalamityAffixes::AffixCraftAction::kIdentify;
@@ -401,6 +427,10 @@
 				return;
 			}
 			PrismaTelemetryController::RecordUiCommand();
+			if (RuneforgeReaderContract::IsReaderCommand(a_command)) {
+				PostRuneforgeReaderJsCommand(a_command);
+				return;
+			}
 
 			auto controller = BuildPrismaCommandController();
 			if (controller.HandleStructuredUiCommand(a_command)) {

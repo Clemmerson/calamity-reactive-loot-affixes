@@ -24,4 +24,11 @@ namespace CalamityAffixes::EventNames
 	inline constexpr std::string_view kMcmForceRebuild = "CalamityAffixes_MCM_ForceRebuild";
 	inline constexpr std::string_view kMcmGrantRecoveryPack = "CalamityAffixes_MCM_GrantRecoveryPack";
 	inline constexpr std::string_view kMcmRecoverMiscCurrency = "CalamityAffixes_MCM_RecoverMiscCurrency";
+
+	// FE ASR owns persistent discovery and sends a full snapshot after DataLoaded
+	// and every save load. Numeric argument is API version 1.
+	inline constexpr std::string_view kFeasrRuneforgeDiscoveryBegin = "FEASR_Runeforge_Discovery_Begin";
+	inline constexpr std::string_view kFeasrRuneforgeDiscoveryRecipe = "FEASR_Runeforge_Discovery_Recipe";
+	inline constexpr std::string_view kFeasrRuneforgeDiscoveryComplete = "FEASR_Runeforge_Discovery_Complete";
+	inline constexpr std::string_view kFeasrRuneforgeOpen = "FEASR_Runeforge_Open";
 }

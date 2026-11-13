@@ -10,6 +10,8 @@ namespace CalamityAffixes
 	namespace detail
 	{
 		inline constexpr std::uint32_t kSelectedReforgeCost = 2u;
+		inline constexpr std::uint32_t kIdentifyScrollCost = 1u;
+		inline constexpr std::uint32_t kScouringOrbCost = 1u;
 		// Selected reforge may be used 6 times per item; identifying or scouring the
 		// item starts the count over. Without a limit, keeping every other affix
 		// always beat rerolling all of them, so the rarer Scouring Orb had no job.

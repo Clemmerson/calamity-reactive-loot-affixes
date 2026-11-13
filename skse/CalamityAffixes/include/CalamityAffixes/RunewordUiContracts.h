@@ -4,20 +4,54 @@
 #include <string>
 #include <vector>
 
+#include "CalamityAffixes/RunewordEffectCardPolicy.h"
+
 namespace CalamityAffixes
 {
 	struct RunewordBaseInventoryEntry
 	{
 		std::uint64_t instanceKey{ 0 };
 		std::string displayName{};  // "<item> [Runeword: <Korean name>]" for older panels
+		std::string displayNameEn{};  // English-safe label for FEASR's native Runeforge
 		std::string baseName{};
+		std::string itemKind{};
 		std::string runewordNameEn{};
 		std::string runewordNameKo{};
+		// Mechanical rw_* ID of the completed runeword ("" when none). UIs match on
+		// this, never on the display name.
+		std::string runewordRecipeId{};
 		bool selected{ false };
+	};
+
+	struct RuneforgeInventoryEntry
+	{
+		std::uint64_t instanceKey{ 0 };
+		std::string displayName{};
+		std::string displayNameEn{};
+		std::string baseName{};
+		std::string itemKind{};
+		std::string runewordNameEn{};
+		std::string runewordNameKo{};
+		std::string runewordRecipeId{};
+		bool selected{ false };
+		bool equipped{ false };
+		bool favorited{ false };
+	};
+
+	struct RuneforgeInventorySnapshot
+	{
+		// Monotonic read sequence for correlating a UI response with its rows.
+		std::uint64_t revision{ 0 };
+		bool known{ false };
+		std::uint32_t skippedMissingUniqueId{ 0 };
+		std::uint32_t skippedNonSingleton{ 0 };
+		std::uint32_t skippedAmbiguousKeys{ 0 };
+		std::vector<RuneforgeInventoryEntry> entries{};
 	};
 
 	struct RunewordRecipeEntry
 	{
+		std::string recipeId{};
 		std::uint64_t recipeToken{ 0 };
 		std::string displayName{};
 		std::string displayNameEn{};
@@ -34,6 +68,9 @@ namespace CalamityAffixes
 		std::string effectDetailTextKo{};
 		std::string recommendedBaseKey{};
 		bool selected{ false };
+		// R8.7.4.21 I3: RunewordEffectCard v1 built from the resolved AffixRuntime + SpellItem data (base proc chance;
+		// no instance context). known == false for recipes outside the FE-ASR manifest.
+		RunewordEffectCardPolicy::Card effectCard{};
 	};
 
 	struct RunewordRuneRequirement
@@ -63,6 +100,7 @@ namespace CalamityAffixes
 		std::uint64_t token{ 0 };
 		std::string displayNameEn{};
 		std::string displayNameKo{};
+		std::string effectSummaryEn{};
 		std::string group{};
 		std::string triggerKey{};
 		std::string slotKind{};
@@ -85,6 +123,10 @@ namespace CalamityAffixes
 		std::uint32_t normalWeaponHitProcStackCount{ 0 };
 		bool hasLuckyHitGate{ false };
 		float luckyHitGateChancePct{ 0.0f };
+		float cooldownSeconds{ 0.0f };
+		float perTargetCooldownSeconds{ 0.0f };
+		float lowHealthThresholdPct{ 0.0f };
+		float lowHealthRearmPct{ 0.0f };
 	};
 
 	struct EquippedBuildSummary
@@ -120,6 +162,8 @@ namespace CalamityAffixes
 		std::uint32_t runeInventoryExpectedCount{ 0 };
 		std::vector<RunewordRuneInventoryEntry> runeInventory{};
 		std::uint32_t regularAffixCount{ 0 };
+		// Ordered runtime tokens for the regular affix state; excludes the completed runeword token.
+		std::vector<std::uint64_t> regularAffixTokens{};
 		std::uint32_t maxRegularAffixCount{ 0 };
 		std::uint32_t expandAffixCost{ 0 };
 		bool canExpandAffix{ false };

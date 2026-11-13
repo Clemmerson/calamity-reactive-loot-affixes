@@ -60,23 +60,64 @@
 
 		// UI helper: enumerate runeword-base candidates from player's inventory.
 		[[nodiscard]] std::vector<RunewordBaseInventoryEntry> GetRunewordBaseInventoryEntries();
-		// UI helper: select specific runeword base by instance key.
-		[[nodiscard]] bool SelectRunewordBase(std::uint64_t a_instanceKey);
+		// UI helper: snapshot already keyed single-copy weapon/armor instances.
+		// Workstation-entry preparation: materialize stable identity only for eligible
+		// player-owned weapon/armor bases whose entire inventory count is exactly one.
+		// The subsequent snapshot remains observational and still rejects stacks/ambiguity.
+		[[nodiscard]] std::uint32_t PrepareRuneforgeSingletonInventoryIdentities();
+		[[nodiscard]] RuneforgeInventorySnapshot GetRuneforgeInventorySnapshot();
+		// Generic Calamity selection retains the current catalog recipe by default;
+		// Runeforge passes false and requires an explicitly learned recipe selection.
+		[[nodiscard]] bool SelectRunewordBase(
+			std::uint64_t a_instanceKey,
+			bool a_allowUndiscoveredRecipe = true);
 		// UI helper: enumerate runeword recipes with selected state.
 		[[nodiscard]] std::vector<RunewordRecipeEntry> GetRunewordRecipeEntries();
 		// UI helper: select specific runeword recipe by token.
-		[[nodiscard]] bool SelectRunewordRecipe(std::uint64_t a_recipeToken);
-		// UI helper: current runeword crafting status for Prisma panel.
-		[[nodiscard]] RunewordPanelState GetRunewordPanelState();
+		[[nodiscard]] bool SelectRunewordRecipe(std::uint64_t a_recipeToken, bool a_allowUnknownRecipeDebug = false);
+		[[nodiscard]] bool SelectRunewordRecipeForBase(
+			std::uint64_t a_expectedInstanceKey,
+			std::string_view a_recipeId,
+			bool a_allowUnknownRecipeDebug = false);
+		// FE ASR owns persistent discovery. Calamity keeps only the current
+		// session mirror received over the versioned ModCallback event contract.
+		[[nodiscard]] bool IsFeasrRuneforgeDiscoveryReady() const;
+		[[nodiscard]] bool IsFeasrRuneforgeContractCompatible() const noexcept { return _feasrRuneforgeContractCompatible; }
+		[[nodiscard]] bool IsFeasrRunewordRecipeKnown(std::string_view a_recipeId) const;
+		// UI helper: guarded transmute. Rejects stale base, recipe, or progress snapshots.
+		[[nodiscard]] OperationResult TransmuteRunewordBase(
+			std::uint64_t a_expectedInstanceKey,
+			std::string_view a_expectedRecipeId,
+			std::uint32_t a_expectedInsertedRunes,
+			bool a_allowUnknownRecipeDebug = false);
+		// UI helper: current runeword crafting status. Prisma keeps the catalog
+		// fallback; Runeforge disables fallback and undiscovered recipes.
+		[[nodiscard]] RunewordPanelState GetRunewordPanelState(
+			bool a_allowUndiscoveredRecipe = true,
+			bool a_allowCurrentRecipeFallback = true);
 		// UI helper: affix tooltip for currently selected runeword base.
 		[[nodiscard]] std::optional<std::string> GetSelectedRunewordBaseAffixTooltip(int a_uiLanguageMode = 2);
+		// R8.7.4.21 I3: effect card of the Runeword engraved on any instance key (the workstation's focused, not yet
+		// selected item), with that instance's effective proc chance. Derived on demand from IAXF slots + config, so it
+		// follows the item through drop/pickup and co-save reload. std::nullopt: no FE-ASR Runeword on that instance.
+		[[nodiscard]] std::optional<RunewordEffectCardPolicy::Card> GetInstanceRunewordEffectCard(
+			std::uint64_t a_instanceKey,
+			bool a_worn);
         [[nodiscard]] OperationResult CraftSelectedAffixes(
             AffixCraftAction a_action, std::uint64_t a_expectedInstanceKey,
             std::uint64_t a_selectedToken = 0u);
+        [[nodiscard]] OperationResult CraftSelectedAffixes(
+            AffixCraftAction a_action, std::uint64_t a_expectedInstanceKey,
+            std::uint64_t a_selectedToken, std::string_view a_expectedAffixSignature,
+            std::uint32_t a_expectedRegularAffixCount);
         [[nodiscard]] OperationResult ExchangeCraftingCurrency(CurrencyExchange a_exchange);
 		[[nodiscard]] OperationResult ExpandSelectedRunewordBaseAffixes(
 			std::uint64_t a_expectedInstanceKey,
 			std::uint8_t a_expectedRegularAffixCount);
+		[[nodiscard]] OperationResult ExpandSelectedRunewordBaseAffixes(
+			std::uint64_t a_expectedInstanceKey,
+			std::uint8_t a_expectedRegularAffixCount,
+			std::string_view a_expectedAffixSignature);
 		[[nodiscard]] OperationResult ResetSelectedRunewordBaseCalamityState();
 
 		// MCM manual recovery: grant starter orbs + missing rune fragments.

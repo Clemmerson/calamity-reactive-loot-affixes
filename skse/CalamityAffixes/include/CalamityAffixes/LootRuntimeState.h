@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "CalamityAffixes/InstanceAffixSlots.h"
+#include "CalamityAffixes/DropPickupOwnershipPolicy.h"
 #include "CalamityAffixes/LootRerollGuard.h"
 #include "CalamityAffixes/LootShuffleBagState.h"
 
@@ -58,6 +59,9 @@ namespace CalamityAffixes
 		std::vector<std::vector<float>> activeProcSlotPenalties{};
 		LootRerollGuard rerollGuard{};
 		std::vector<PendingDroppedRefDelete> pendingDroppedRefDeletes{};
+		std::vector<CalamityAffixes::PendingDropOwnership> pendingDropOwnership{};
+		bool pendingDropOwnershipOverflow{ false };
+		std::uint32_t pendingDropOwnershipOverflowExpiresAtDay{ 0u };
 		std::atomic_bool dropDeleteDrainScheduled{ false };
 		std::map<std::pair<LootRerollGuard::FormID, LootRerollGuard::FormID>, std::int32_t> playerContainerStash{};
 
@@ -90,6 +94,9 @@ namespace CalamityAffixes
 			runewordFragmentFailStreak = 0;
 			reforgeOrbFailStreak = 0;
 			pendingDroppedRefDeletes.clear();
+			pendingDropOwnership.clear();
+			pendingDropOwnershipOverflow = false;
+			pendingDropOwnershipOverflowExpiresAtDay = 0u;
 			dropDeleteDrainScheduled.store(false, std::memory_order_release);
 		}
 	};

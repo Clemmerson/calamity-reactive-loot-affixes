@@ -2,9 +2,14 @@
 
 #include "CalamityAffixes/PluginEditorIds.h"
 #include "CalamityAffixes/PrismaTooltip.h"
+#include "CalamityAffixes/RuneforgeMenu.h"
+#include "CalamityAffixes/RuneforgeWorkstation.h"
+#include "CalamityAffixes/RuneforgeWorkstationContextPolicy.h"
+#include "CalamityAffixes/EventNames.h"
 #include "EventBridge.Loot.Runeword.Detail.h"
 
 #include <algorithm>
+#include <charconv>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -15,6 +20,167 @@
 
 namespace CalamityAffixes
 {
+	bool EventBridge::HandleFeasrRuneforgeModCallback(
+		std::string_view a_eventName,
+		std::string_view a_stringArg,
+		float a_numberArg)
+	{
+		using namespace EventNames;
+		const bool contractCompatible = IsFeasrRuneforgeContractCompatible();
+		if (a_eventName == kFeasrRuneforgeDiscoveryBegin) {
+			const auto separator = a_stringArg.find(':');
+			const auto revision = separator == std::string_view::npos ? a_stringArg : a_stringArg.substr(0u, separator);
+			const auto expectedCount = separator == std::string_view::npos ? std::string_view{} : a_stringArg.substr(separator + 1u);
+			SKSE::log::info(
+				"RuneforgeDiag: Discovery_Begin revision='{}' expectedCount='{}' numArg={} contractCompatible={}",
+				revision,
+				expectedCount,
+				a_numberArg,
+				contractCompatible);
+		}
+		if (a_eventName == kFeasrRuneforgeOpen) {
+			SKSE::log::info(
+				"RuneforgeDiag: Open received strArg='{}' numArg={} discoveryReady={} runtimeEnabled={} contractCompatible={}",
+				a_stringArg,
+				a_numberArg,
+				_feasrDiscoveryReady,
+				_runtimeSettings.enabled.load(std::memory_order_relaxed),
+				contractCompatible);
+		}
+		if (!contractCompatible) {
+			_feasrKnownRunewordRecipeIds.clear();
+			_feasrDiscoveryReady = false;
+			_feasrDiscoverySyncActive = false;
+			_feasrDiscoverySyncValid = false;
+			if (a_eventName == kFeasrRuneforgeOpen) {
+				SKSE::log::info("RuneforgeDiag: QueueOpen(false) not called; contract incompatible");
+				EmitHudNotification("Runeforge unavailable: Calamity 2.2.8 runtime contract mismatch.");
+			}
+			return a_eventName == kFeasrRuneforgeDiscoveryBegin ||
+				a_eventName == kFeasrRuneforgeDiscoveryRecipe ||
+				a_eventName == kFeasrRuneforgeDiscoveryComplete ||
+				a_eventName == kFeasrRuneforgeOpen;
+		}
+		if (a_eventName == kFeasrRuneforgeDiscoveryBegin) {
+			_feasrKnownRunewordRecipeIds.clear();
+			_feasrDiscoveryRevision.clear();
+			_feasrDiscoveryExpectedCount = 0u;
+			_feasrDiscoveryReceivedCount = 0u;
+			const auto separator = a_stringArg.find(':');
+			std::uint32_t revision = 0u;
+			std::uint32_t expectedCount = 0u;
+			const auto parseUInt = [](std::string_view text, std::uint32_t& value) {
+				const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
+				return !text.empty() && error == std::errc{} && end == text.data() + text.size();
+			};
+			const bool headerValid = separator != std::string_view::npos &&
+				parseUInt(a_stringArg.substr(0u, separator), revision) &&
+				parseUInt(a_stringArg.substr(separator + 1u), expectedCount) &&
+				expectedCount <= 4096u;
+			_feasrDiscoverySyncActive = a_numberArg == 1.0f && headerValid;
+			_feasrDiscoverySyncValid = _feasrDiscoverySyncActive;
+			if (headerValid) {
+				_feasrDiscoveryRevision.assign(a_stringArg.substr(0u, separator));
+				_feasrDiscoveryExpectedCount = expectedCount;
+			}
+			_feasrDiscoveryReady = false;
+			return true;
+		}
+
+		if (a_eventName == kFeasrRuneforgeDiscoveryRecipe) {
+			const auto separator = a_stringArg.find(':');
+			if (!_feasrDiscoverySyncActive || a_numberArg != 1.0f || separator == std::string_view::npos ||
+				a_stringArg.substr(0u, separator) != _feasrDiscoveryRevision ||
+				separator + 1u >= a_stringArg.size() || a_stringArg.size() - separator - 1u > 128u) {
+				if (_feasrDiscoverySyncActive) {
+					_feasrDiscoverySyncValid = false;
+				}
+				return true;
+			}
+			const auto recipeId = a_stringArg.substr(separator + 1u);
+			const auto it = std::find_if(_runewordState.recipes.begin(), _runewordState.recipes.end(), [&](const auto& recipe) {
+				return recipe.id == recipeId;
+			});
+			if (it != _runewordState.recipes.end()) {
+				if (!_feasrKnownRunewordRecipeIds.emplace(recipeId).second) {
+					_feasrDiscoverySyncValid = false;
+				}
+				++_feasrDiscoveryReceivedCount;
+			} else {
+				_feasrDiscoverySyncValid = false;
+				SKSE::log::warn("Runeforge: FE ASR sent unknown recipe id '{}'; snapshot rejected.", recipeId);
+			}
+			return true;
+		}
+
+		if (a_eventName == kFeasrRuneforgeDiscoveryComplete) {
+			const auto separator = a_stringArg.find(':');
+			std::uint32_t revision = 0u;
+			std::uint32_t expectedCount = 0u;
+			const auto parseUInt = [](std::string_view text, std::uint32_t& value) {
+				const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
+				return !text.empty() && error == std::errc{} && end == text.data() + text.size();
+			};
+			const bool headerValid = separator != std::string_view::npos &&
+				parseUInt(a_stringArg.substr(0u, separator), revision) &&
+				parseUInt(a_stringArg.substr(separator + 1u), expectedCount);
+			const bool matchingSnapshot = headerValid &&
+				a_stringArg.substr(0u, separator) == _feasrDiscoveryRevision &&
+				expectedCount == _feasrDiscoveryExpectedCount;
+			_feasrDiscoveryReady = _feasrDiscoverySyncActive && _feasrDiscoverySyncValid &&
+				a_numberArg == 1.0f && matchingSnapshot &&
+				_feasrDiscoveryReceivedCount == _feasrDiscoveryExpectedCount &&
+				_feasrKnownRunewordRecipeIds.size() == _feasrDiscoveryExpectedCount;
+			SKSE::log::info(
+				"RuneforgeDiag: Discovery_Complete discoveryReady={} receivedCount={} expectedCount={}",
+				_feasrDiscoveryReady,
+				_feasrDiscoveryReceivedCount,
+				_feasrDiscoveryExpectedCount);
+			_feasrDiscoverySyncActive = false;
+			if (!_feasrDiscoveryReady) {
+				_feasrKnownRunewordRecipeIds.clear();
+				SKSE::log::warn("Runeforge: rejected FE ASR discovery snapshot (version, revision, or recipe count mismatch).");
+			}
+			return true;
+		}
+
+		if (a_eventName == kFeasrRuneforgeOpen) {
+			std::uint64_t activationSequence = 0;
+			const auto [sequenceEnd, sequenceError] = std::from_chars(
+				a_stringArg.data(), a_stringArg.data() + a_stringArg.size(), activationSequence);
+			if (a_stringArg.empty()) {
+				SKSE::log::warn("RuneforgeDiag: Open rejected source=direct_or_scripted reason=activation_sequence_missing; QueueOpen not called");
+				return true;
+			}
+			if (sequenceError != std::errc{} || sequenceEnd != a_stringArg.data() + a_stringArg.size() ||
+				std::to_string(activationSequence) != a_stringArg) {
+				SKSE::log::warn("RuneforgeDiag: Open rejected source=untrusted_event reason=activation_sequence_malformed value='{}'; QueueOpen not called", a_stringArg);
+				return true;
+			}
+			if (!RuneforgeWorkstation::ConsumeClaimedActivationIntent(activationSequence)) {
+				SKSE::log::warn("RuneforgeDiag: Open rejected source=untrusted_event reason=claimed_intent_stale_context_changed_or_already_consumed seq={}; QueueOpen not called", activationSequence);
+				return true;
+			}
+			const bool apiVersionValid = a_numberArg == 1.0f;
+			const bool discoveryReady = _feasrDiscoveryReady;
+			const bool runtimeEnabled = _runtimeSettings.enabled.load(std::memory_order_relaxed);
+			if (!apiVersionValid || !discoveryReady || !runtimeEnabled) {
+				SKSE::log::warn(
+					"RuneforgeDiag: Open rejected after intent consumed apiVersionValid={} discoveryReady={} runtimeEnabled={}; QueueOpen not called",
+					apiVersionValid,
+					discoveryReady,
+					runtimeEnabled);
+				EmitHudNotification("Runeforge: discovery or Calamity runtime is not ready.");
+				return true;
+			}
+			SKSE::log::info("RuneforgeDiag: Open accepted source=physical_activation intent=consumed; calling QueueOpen(false)");
+			RuneforgeMenu::QueueOpen(false);
+			return true;
+		}
+
+		return false;
+	}
+
 	namespace
 	{
 		// MCM passes boolean settings as float 1.0/0.0; threshold for truthy conversion.
@@ -357,6 +523,13 @@ namespace CalamityAffixes
 			return true;
 		}
 		if (a_eventName == kRunewordInsertRuneEvent) {
+			// RC1 legacy-UI policy: with FEASR Runeforge active, runeword insertion runs only at the Runeforge.
+			using namespace RuneforgeWorkstation::ContextPolicy;
+			if (ResolveLegacy(LegacyOperation::kRunewordInsert, RuneforgeWorkstation::IsFeasrRuneforgeActive()) != LegacyVerdict::kAllow) {
+				SKSE::log::info("RuneforgeDiag: legacy runeword insert event refused (FEASR Runeforge active)");
+				EmitHudNotification(kUseRuneforgeMessage.data());
+				return true;
+			}
 			InsertRunewordRuneIntoSelectedBase();
 			return true;
 		}

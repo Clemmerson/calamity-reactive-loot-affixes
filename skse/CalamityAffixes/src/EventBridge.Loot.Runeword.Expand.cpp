@@ -36,10 +36,18 @@ namespace CalamityAffixes
 		std::uint64_t a_expectedInstanceKey,
 		std::uint8_t a_expectedRegularAffixCount)
 	{
+		return ExpandSelectedRunewordBaseAffixes(a_expectedInstanceKey, a_expectedRegularAffixCount, {});
+	}
+
+	EventBridge::OperationResult EventBridge::ExpandSelectedRunewordBaseAffixes(
+		std::uint64_t a_expectedInstanceKey,
+		std::uint8_t a_expectedRegularAffixCount,
+		std::string_view a_expectedAffixSignature)
+	{
 		const std::scoped_lock lock(_stateMutex);
 		OperationResult result{};
-		if (!_configLoaded) {
-			result.message = "Affix expansion unavailable: runtime config not loaded.";
+		if (!_configLoaded || !_runtimeSettings.enabled.load(std::memory_order_relaxed)) {
+			result.message = "Affix expansion unavailable: Calamity runtime is disabled or not ready.";
 			return result;
 		}
 		if (_runewordState.transmuteInProgress || _runewordState.affixExpansionInProgress) {
@@ -155,6 +163,18 @@ namespace CalamityAffixes
 				regularSlots.count)) {
 			result.message = "Affix expansion failed: affix count changed; refresh and try again.";
 			return result;
+		}
+		if (!a_expectedAffixSignature.empty()) {
+			std::string currentSignature;
+			for (const auto token : regularSlots) {
+				if (!currentSignature.empty()) currentSignature.push_back(',');
+				currentSignature += std::to_string(token);
+			}
+			if (currentSignature.empty()) currentSignature = "-";
+			if (currentSignature != a_expectedAffixSignature) {
+				result.message = "Affixes changed; review the current state and try again.";
+				return result;
+			}
 		}
 		if (!detail::IsCanonicalRegularAffixExpansionLayout(
 				regularSlots.count,

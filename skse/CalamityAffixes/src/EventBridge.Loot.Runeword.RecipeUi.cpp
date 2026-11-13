@@ -2,6 +2,7 @@
 #include "CalamityAffixes/RunewordUiPolicy.h"
 #include "EventBridge.Loot.Runeword.Detail.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -10,10 +11,33 @@ namespace CalamityAffixes
 {
 	using namespace RunewordDetail;
 
-	bool EventBridge::SelectRunewordRecipe(std::uint64_t a_recipeToken)
+	bool EventBridge::SelectRunewordRecipeForBase(
+		std::uint64_t a_expectedInstanceKey,
+		std::string_view a_recipeId,
+		bool a_allowUnknownRecipeDebug)
 	{
 		const std::scoped_lock lock(_stateMutex);
-		if (!_configLoaded || a_recipeToken == 0u || _runewordState.recipes.empty()) {
+		if (!_runtimeSettings.enabled.load(std::memory_order_relaxed) ||
+			_runewordState.transmuteInProgress || _runewordState.affixExpansionInProgress ||
+			(!_feasrDiscoveryReady && !a_allowUnknownRecipeDebug) ||
+			a_expectedInstanceKey == 0u || a_recipeId.empty() ||
+			(!a_allowUnknownRecipeDebug && !_feasrKnownRunewordRecipeIds.contains(std::string(a_recipeId))) ||
+			!_runewordState.selectedBaseKey || *_runewordState.selectedBaseKey != a_expectedInstanceKey) {
+			return false;
+		}
+		const auto recipeIt = std::find_if(_runewordState.recipes.begin(), _runewordState.recipes.end(), [&](const auto& recipe) {
+			return recipe.id == a_recipeId && HasRunewordRuntimeEffect(recipe);
+		});
+		return recipeIt != _runewordState.recipes.end() && SelectRunewordRecipe(recipeIt->token, a_allowUnknownRecipeDebug);
+	}
+
+	bool EventBridge::SelectRunewordRecipe(std::uint64_t a_recipeToken, bool a_allowUnknownRecipeDebug)
+	{
+		const std::scoped_lock lock(_stateMutex);
+		if (!_configLoaded || !_runtimeSettings.enabled.load(std::memory_order_relaxed) ||
+			_runewordState.transmuteInProgress || _runewordState.affixExpansionInProgress ||
+			(!_feasrDiscoveryReady && !a_allowUnknownRecipeDebug) ||
+			a_recipeToken == 0u || _runewordState.recipes.empty()) {
 			return false;
 		}
 
@@ -25,6 +49,9 @@ namespace CalamityAffixes
 
 		const auto idx = it->second;
 		const auto& recipe = _runewordState.recipes[idx];
+		if (!a_allowUnknownRecipeDebug && !_feasrKnownRunewordRecipeIds.contains(recipe.id)) {
+			return false;
+		}
 		if (!HasRunewordRuntimeEffect(recipe)) {
 			EmitHudNotification("Runeword Recipe: runtime effect not available.");
 			return false;
@@ -48,15 +75,8 @@ namespace CalamityAffixes
 			}
 		}
 
-		std::string runes;
-		for (std::size_t i = 0; i < recipe.runeIds.size(); ++i) {
-			if (i > 0) {
-				runes.push_back('-');
-			}
-			runes.append(recipe.runeIds[i]);
-		}
-
-		std::string note = "Runeword Recipe: " + recipe.HudName() + " [" + runes + "]";
+		// FE-ASR presentation: public recipe name and rune sequence (mechanical order).
+		std::string note = "Runeword Recipe: " + recipe.HudName() + " [" + recipe.PresentationRuneSequence() + "]";
 		if (_runewordState.selectedBaseKey) {
 			AppendRunewordSelectionRecommendation(note, recipe, ResolveInstanceLootType(*_runewordState.selectedBaseKey));
 		}

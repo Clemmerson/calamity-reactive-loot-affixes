@@ -5,9 +5,15 @@
 #include <memory>
 #include <type_traits>
 #include <utility>
+#include <atomic>
 
 namespace CalamityAffixes
 {
+	namespace
+	{
+		std::atomic<std::uint64_t> g_engineEventIngressSequence{ 0u };
+	}
+
 	template <class Event>
 	RE::BSEventNotifyControl EventBridge::DispatchEngineEvent(
 		const Event* a_event,
@@ -22,8 +28,42 @@ namespace CalamityAffixes
 		const auto generation = _eventDispatcher.CaptureGeneration();
 		EngineEventContext context{
 			.observedAt = std::chrono::steady_clock::now(),
+			.ingressSequence = g_engineEventIngressSequence.fetch_add(1u, std::memory_order_relaxed) + 1u,
 			.procOrigin = ScopedProcDepth::IsActiveOnCurrentThread(_combatState)
 		};
+		const auto ingressSequence = context.ingressSequence;
+		bool traceDropPickup = false;
+		if constexpr (std::is_same_v<Event, RE::TESActivateEvent>) {
+			auto* actionRef = SanitizeObjectPointer(a_event->actionRef.get());
+			auto* actionActor = actionRef ? actionRef->template As<RE::Actor>() : nullptr;
+			auto* sourceRef = SanitizeObjectPointer(a_event->objectActivated.get());
+			auto* baseObject = sourceRef ? sourceRef->GetBaseObject() : nullptr;
+			if (actionActor && actionActor->IsPlayerRef() && baseObject && baseObject->template As<RE::TESObjectARMO>()) {
+				traceDropPickup = true;
+				SKSE::log::info(
+					"[R84-XFER] ingress activate seq={} actor={:08X} refHandle={:016X} refForm={:08X} base={:08X}.",
+					context.ingressSequence,
+					actionRef->GetFormID(),
+					static_cast<std::uint64_t>(sourceRef->GetHandle().native_handle()),
+					sourceRef->GetFormID(),
+					baseObject->GetFormID());
+			}
+		} else if constexpr (std::is_same_v<Event, RE::TESContainerChangedEvent>) {
+			auto* player = RE::PlayerCharacter::GetSingleton();
+			const auto playerId = player ? player->GetFormID() : 0u;
+			if (playerId != 0u && a_event->newContainer == playerId && a_event->oldContainer == 0u) {
+				traceDropPickup = true;
+				SKSE::log::info(
+					"[R84-XFER] ingress world-to-player seq={} base={:08X} old={:08X} new={:08X} count={} eventUid={} refHandle={:016X}.",
+					context.ingressSequence,
+					a_event->baseObj,
+					a_event->oldContainer,
+					a_event->newContainer,
+					a_event->itemCount,
+					a_event->uniqueID,
+					static_cast<std::uint64_t>(RE::ObjectRefHandle(a_event->reference).native_handle()));
+			}
+		}
 		auto event = *a_event;
 		if constexpr (std::is_same_v<Event, RE::TESHitEvent>) {
 			// TESHitEvent's NiPointers own cause/target; HitData's actor/source
@@ -59,11 +99,18 @@ namespace CalamityAffixes
 				}
 				(void)(this->*a_handler)(&event, a_lock, context);
 			});
-		(void)_eventDispatcher.Submit(
+		const bool admitted = _eventDispatcher.Submit(
 			generation,
 			std::move(work),
 			_stateMutex,
 			[this](auto a_generation) { return ScheduleEngineEventDrain(a_generation); });
+		if (traceDropPickup) {
+			SKSE::log::info(
+				"[R84-XFER] admission seq={} generation={} admitted={}",
+				ingressSequence,
+				generation,
+				admitted);
+		}
 		return RE::BSEventNotifyControl::kContinue;
 	}
 

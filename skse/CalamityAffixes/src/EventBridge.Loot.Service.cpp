@@ -516,13 +516,8 @@ namespace CalamityAffixes
 					} else if (TryAddLootCurrencyToCorpseInventory(fragmentItem, a_corpse)) {
 						CommitRunewordFragmentGrant(true);
 						result.runewordDropGranted = true;
-						std::string runeName = "Rune";
-						if (const auto nameIt = _runewordState.runeNameByToken.find(runeToken);
-							nameIt != _runewordState.runeNameByToken.end()) {
-							runeName = nameIt->second;
-						}
 						std::string note = "Runeword Fragment Drop: ";
-						note.append(runeName);
+						note.append(ResolveRuneDisplayName(runeToken));
 						if (runewordPityTriggered) {
 							note.append(" [Pity]");
 						}

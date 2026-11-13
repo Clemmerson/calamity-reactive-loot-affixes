@@ -16,6 +16,10 @@
 		RE::BSEventNotifyControl HandleContainerChangedEvent(const RE::TESContainerChangedEvent*, EventStateLock&, const EngineEventContext&);
 		RE::BSEventNotifyControl HandleUniqueIDChangeEvent(const RE::TESUniqueIDChangeEvent*, EventStateLock&, const EngineEventContext&);
 		RE::BSEventNotifyControl HandleModCallbackEvent(const SKSE::ModCallbackEvent*, EventStateLock&, const EngineEventContext&);
+		[[nodiscard]] bool HandleFeasrRuneforgeModCallback(
+			std::string_view a_eventName,
+			std::string_view a_stringArg,
+			float a_numberArg);
 
 		// Runtime lifecycle and data maintenance.
 		void ResetRuntimeStateForConfigReload();
@@ -59,6 +63,10 @@
 			SKSE::SerializationInterface* a_intfc,
 			std::uint32_t a_version,
 			std::uint32_t a_length);
+		void LoadPendingDropOwnershipRecord(
+			SKSE::SerializationInterface* a_intfc,
+			std::uint32_t a_version,
+			std::uint32_t a_length);
 		void ResetActiveCountsStateForRebuild();
 		void RefreshInventoryInstanceActiveState(
 			RE::InventoryEntryData* a_entry,
@@ -93,9 +101,14 @@
 		[[nodiscard]] bool HasMaterialInstanceState(std::uint64_t a_instanceKey) const;
 		[[nodiscard]] bool IsInstanceKeyTracked(std::uint64_t a_instanceKey) const;
 		void DiscardInstanceKeyState(std::uint64_t a_instanceKey);
-		void RemapInstanceKey(std::uint64_t a_oldKey, std::uint64_t a_newKey);
+		bool RemapInstanceKey(std::uint64_t a_oldKey, std::uint64_t a_newKey);
+		void RememberInstanceBaseObject(std::uint64_t a_instanceKey, RE::FormID a_baseObjectFormID);
+		void RebuildInstanceBaseObjectIndexFromPlayerInventory();
+		[[nodiscard]] std::optional<std::uint64_t> ResolveUniqueUnboundMarkedPlayerInstanceKey(RE::FormID a_baseObjectFormID) const;
 		[[nodiscard]] bool NormalizeLegacyPlayerInstanceKeys();
 		[[nodiscard]] bool PruneOrphanedPlayerInstanceKeys();
+		void ExpirePendingDropOwnership(std::uint32_t a_currentDay);
+		void ReconcileLoadedPendingDropOwnership();
 		void ProcessDroppedRefDeleted(
 			LootRerollGuard::RefHandle a_refHandle,
 			std::uint64_t a_detachedWorldKey);
@@ -111,10 +124,11 @@
 			detail::WeaponSubtypeGroup a_weaponSubtype) const;
 		[[nodiscard]] static std::uint64_t HashLootPreviewSeed(std::uint64_t a_instanceKey, std::uint64_t a_salt);
 		[[nodiscard]] bool PlayerHasInstanceKey(std::uint64_t a_instanceKey) const;
+		[[nodiscard]] bool PlayerHasExactDropPickupIdentity(std::uint64_t a_instanceKey, RE::FormID a_baseObjectFormID) const;
 		[[nodiscard]] const std::vector<std::uint64_t>* FindEquippedInstanceKeysForAffixTokenCached(std::uint64_t a_affixToken) const;
 		[[nodiscard]] std::optional<std::uint64_t> ResolvePrimaryEquippedInstanceKey(std::uint64_t a_affixToken) const;
 		[[nodiscard]] std::vector<std::uint64_t> CollectEquippedInstanceKeysForAffixToken(std::uint64_t a_affixToken) const;
-		[[nodiscard]] std::vector<std::uint64_t> CollectEquippedRunewordBaseCandidates(bool a_ensureUniqueId);
+		[[nodiscard]] std::vector<std::uint64_t> CollectEquippedRunewordBaseCandidates();
 		[[nodiscard]] bool ResolveSelectedRunewordBaseInstance(
 			std::uint64_t& a_outInstanceKey,
 			RE::InventoryEntryData*& a_outEntry,
@@ -132,7 +146,8 @@
 		[[nodiscard]] bool HasRunewordRuntimeEffect(const RunewordRecipe& a_recipe) const noexcept;
 		[[nodiscard]] const RunewordRecipe* ResolveSelectedRunewordRecipe(
 			std::uint64_t a_selectedBaseKey,
-			const RunewordRecipe* a_preferredRecipe = nullptr) const;
+			const RunewordRecipe* a_preferredRecipe = nullptr,
+			bool a_allowCurrentRecipeFallback = true) const;
 		void AppendRunewordSelectionRecommendation(
 			std::string& a_note,
 			const RunewordRecipe& a_recipe,
@@ -143,6 +158,24 @@
 			std::uint64_t a_instanceKey,
 			const RunewordRecipe& a_recipe) const;
 		[[nodiscard]] static std::string BuildRunewordApplyBlockMessage(RunewordApplyBlockReason a_reason);
+		// FE-ASR presentation boundary (EventBridge.Loot.Runeword.Presentation.cpp).
+		// Read-only over mechanical state; returns player-facing English text.
+		[[nodiscard]] const RunewordRecipe* FindRunewordRecipeByResultAffixToken(std::uint64_t a_resultAffixToken) const;
+		// R8.7.4.21 I3: RunewordEffectCard v1 input copied from the resolved runtime data (AffixRuntime + loaded SpellItem
+		// effects); EventBridge.Loot.Runeword.RecipeEntries.cpp. Caller holds _stateMutex.
+		[[nodiscard]] RunewordEffectCardPolicy::CardInput BuildRunewordEffectCardInput(
+			const AffixRuntime& a_affix,
+			const RunewordRecipe& a_recipe) const;
+		// Per-instance effective proc chance context with the numbers the inventory tooltip shows
+		// (EventBridge.Loot.TooltipResolution.cpp). mode kNone when the tooltip would show no chance line.
+		[[nodiscard]] RunewordEffectCardPolicy::ChanceContext ResolveInstanceProcChanceContext(
+			const AffixRuntime& a_affix,
+			std::size_t a_affixIndex,
+			std::uint64_t a_instanceKey,
+			const InstanceAffixSlots& a_slots,
+			bool a_worn) const;
+		[[nodiscard]] std::string ResolveAffixDisplayNameEn(const AffixRuntime& a_affix) const;
+		[[nodiscard]] std::string ResolveRuneDisplayName(std::uint64_t a_runeToken, std::string_view a_fallback = "Rune") const;
 		void InitializeRunewordCatalog();
 		bool LoadRuntimeConfigJson(nlohmann::json& a_outJson) const;
 		void ApplyLootConfigFromJson(const nlohmann::json& a_configRoot);
@@ -303,7 +336,7 @@
 		void SanitizeRunewordState();
 		void CycleRunewordBase(std::int32_t a_direction);
 		void CycleRunewordRecipe(std::int32_t a_direction);
-		void InsertRunewordRuneIntoSelectedBase();
+		void InsertRunewordRuneIntoSelectedBase(bool a_allowUnknownRecipeDebug = false);
 		struct ConsumedRunewordFragment
 		{
 			std::uint64_t token{ 0u };
@@ -364,7 +397,8 @@
 		[[nodiscard]] bool ApplyRunewordResult(
 			std::uint64_t a_instanceKey,
 			const RunewordRecipe& a_recipe,
-			std::string* a_outFailureReason = nullptr);
+			std::string* a_outFailureReason = nullptr,
+			bool a_allowUnknownRecipeDebug = false);
 		void LogRunewordStatus() const;
 		InstanceRuntimeState& EnsureInstanceRuntimeState(std::uint64_t a_instanceKey, std::uint64_t a_affixToken);
 		[[nodiscard]] const InstanceRuntimeState* FindInstanceRuntimeState(std::uint64_t a_instanceKey, std::uint64_t a_affixToken) const;

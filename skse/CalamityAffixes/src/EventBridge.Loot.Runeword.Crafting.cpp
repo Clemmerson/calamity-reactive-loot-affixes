@@ -52,10 +52,12 @@ namespace CalamityAffixes
 					return;
 				}
 
+				// runeName stays the internal key for logs; HUD text uses the FE-ASR name.
+				const auto runeDisplayName = ResolveRuneDisplayName(runeToken);
 				const auto given = GrantRunewordFragments(player, _runewordState.runeNameByToken, runeToken, a_amount);
 				if (given == 0u) {
 					std::string note = "Runeword fragment item missing: ";
-					note.append(runeName);
+					note.append(runeDisplayName);
 					EmitHudNotification(note.c_str());
 					SKSE::log::error(
 						"CalamityAffixes: runeword fragment item missing (runeToken={:016X}, runeName={}).",
@@ -65,7 +67,7 @@ namespace CalamityAffixes
 				}
 
 				const auto owned = GetOwnedRunewordFragmentCount(player, _runewordState.runeNameByToken, runeToken);
-				const std::string note = "Runeword Fragment + " + runeName + " (" + std::to_string(owned) + ")";
+				const std::string note = "Runeword Fragment + " + runeDisplayName + " (" + std::to_string(owned) + ")";
 				EmitHudNotification(note.c_str());
 			}
 
@@ -309,10 +311,7 @@ namespace CalamityAffixes
 					note.append(" | Runes:");
 					auto* player = RE::PlayerCharacter::GetSingleton();
 					for (const auto token : recipe->runeTokens) {
-						std::string runeName = "Rune";
-						if (const auto nameIt = _runewordState.runeNameByToken.find(token); nameIt != _runewordState.runeNameByToken.end()) {
-							runeName = nameIt->second;
-						}
+						const auto runeName = ResolveRuneDisplayName(token);
 						const auto owned = GetOwnedRunewordFragmentCount(player, _runewordState.runeNameByToken, token);
 						note.push_back(' ');
 						note.append(runeName);

@@ -61,9 +61,11 @@ namespace CalamityAffixes
 			out.token = recipe.resultAffixToken;
 			out.action.sourceToken = out.token;
 			const std::string suffix = runeSequence.empty() ? "(Auto)" : ("[" + runeSequence + "]");
-			const std::string recipeNameEn = recipe.displayNameEn.empty() ? recipe.displayName : recipe.displayNameEn;
+			const std::string recipeNameEn = recipe.displayNameEn.empty() ? recipe.id : recipe.displayNameEn;
 			const std::string recipeNameKo = recipe.displayNameKo.empty() ? recipe.displayName : recipe.displayNameKo;
 			out.displayNameEn = "Runeword " + recipeNameEn + " " + suffix;
+			// FE-ASR presentation for manifest recipes; unknown recipes keep the upstream name.
+			out.displayNameEn = RuneforgePresentation::RunewordResultAffixNameEn(recipe.id, recipe.runeIds, out.displayNameEn);
 			out.displayNameKo = "룬워드 " + recipeNameKo + " " + suffix;
 			out.displayName = out.displayNameKo;
 			out.label = recipeNameKo;

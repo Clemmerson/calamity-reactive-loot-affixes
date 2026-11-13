@@ -5,16 +5,19 @@
 #include <atomic>
 #include <cctype>
 #include <charconv>
+#include <cmath>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <functional>
 #include <limits>
 #include <mutex>
+#include <numeric>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <thread>
+#include <vector>
 
 #include <nlohmann/json.hpp>
 
@@ -25,6 +28,10 @@
 #include "CalamityAffixes/EventNames.h"
 #include "CalamityAffixes/LootUiGuards.h"
 #include "CalamityAffixes/PrismaLayoutPersistence.h"
+#include "CalamityAffixes/RuneforgeMenu.h"
+#include "CalamityAffixes/RuneforgeReaderInputContract.h"
+#include "CalamityAffixes/RuneforgeWorkstation.h"
+#include "CalamityAffixes/RuneforgeWorkstationContextPolicy.h"
 #include "CalamityAffixes/RunewordUiPolicy.h"
 #include "CalamityAffixes/UserSettingsPersistence.h"
 
@@ -88,6 +95,14 @@ namespace CalamityAffixes::PrismaTooltip
 		void HandleRelevantMenuOpened();
 		[[nodiscard]] int ResolveRelevantMenuCountAfterClose() noexcept;
 		void SyncViewStateAfterRelevantMenusClosed(int a_openCount);
+		void TickRuneforgeReader();
+		void ServiceRuneforgeReader();
+		void ResetRuneforgeReaderSessionState();
+		void RequestRuneforgeReaderFocus();
+		void CloseRuneforgeReaderOnGameThread(RuneforgeReaderContract::Source a_reason);
+		void ApplyRuneforgeReaderAction(RuneforgeReaderContract::Action a_action, RuneforgeReaderContract::Source a_source);
+		void PostRuneforgeReaderJsCommand(std::string_view a_command);
+		bool HandleRuneforgeReaderInputBatch(const RE::InputEvent* a_events);
 
 		[[nodiscard]] bool IsRelevantMenu(std::string_view a_name) noexcept
 		{
@@ -296,6 +311,11 @@ namespace CalamityAffixes::PrismaTooltip
 		return IsViewReady();
 	}
 
+	int GetUiLanguageMode()
+	{
+		return NormalizeUiLanguageMode(g_uiLanguageMode.load());
+	}
+
 	void ReportStatus()
 	{
 		QueueTask([]() {
@@ -337,5 +357,102 @@ namespace CalamityAffixes::PrismaTooltip
 		QueueTask([]() {
 			SetControlPanelOpenImpl(!g_controlPanelOpen.load());
 		});
+	}
+
+	void HandleRuneforgeReaderEvent(std::string_view a_eventName, std::string_view a_strArg, float a_numArg)
+	{
+		constexpr std::string_view beginStone = "FEASR_Runeforge_Reader_BeginStone";
+		constexpr std::string_view beginMetal = "FEASR_Runeforge_Reader_BeginMetal";
+		constexpr std::string_view pageEvent = "FEASR_Runeforge_Reader_Page";
+		constexpr std::string_view commitEvent = "FEASR_Runeforge_Reader_Commit";
+		if (a_eventName == beginStone || a_eventName == beginMetal) {
+			if (a_strArg.empty() || a_strArg.size() > 160u || !std::isfinite(a_numArg) ||
+				std::floor(a_numArg) != a_numArg || a_numArg < 1.0f || a_numArg > 20.0f) {
+				SKSE::log::warn("Runeforge reader begin rejected: invalid title or page count.");
+				return;
+			}
+			std::scoped_lock lock(g_runeforgeReaderDraftMutex);
+			g_runeforgeReaderDraft = {};
+			g_runeforgeReaderDraft.active = true;
+			g_runeforgeReaderDraft.expectedPages = static_cast<std::size_t>(a_numArg);
+			g_runeforgeReaderDraft.document.title.assign(a_strArg);
+			g_runeforgeReaderDraft.document.substrate = a_eventName == beginMetal ? "metal" : "stone";
+			g_runeforgeReaderDraft.document.pages.resize(g_runeforgeReaderDraft.expectedPages);
+			return;
+		}
+		if (a_eventName == pageEvent) {
+			if (!std::isfinite(a_numArg) || std::floor(a_numArg) != a_numArg || a_numArg < 1.0f || a_numArg > 20.0f ||
+				a_strArg.empty() || a_strArg.size() > 6000u) {
+				SKSE::log::warn("Runeforge reader page rejected: invalid index or page size.");
+				return;
+			}
+			std::scoped_lock lock(g_runeforgeReaderDraftMutex);
+			if (!g_runeforgeReaderDraft.active) return;
+			const auto index = static_cast<std::size_t>(a_numArg - 1.0f);
+			if (index >= g_runeforgeReaderDraft.expectedPages) return;
+			g_runeforgeReaderDraft.document.pages[index].assign(a_strArg);
+			return;
+		}
+		if (a_eventName != commitEvent) return;
+
+		RuneforgeReaderDocument document;
+		{
+			std::scoped_lock lock(g_runeforgeReaderDraftMutex);
+			if (!g_runeforgeReaderDraft.active || !std::isfinite(a_numArg) ||
+				std::floor(a_numArg) != a_numArg || static_cast<std::size_t>(a_numArg) != g_runeforgeReaderDraft.expectedPages) {
+				SKSE::log::warn("Runeforge reader commit rejected: no matching bounded page draft.");
+				g_runeforgeReaderDraft = {};
+				return;
+			}
+			const auto totalBytes = std::accumulate(
+				g_runeforgeReaderDraft.document.pages.begin(),
+				g_runeforgeReaderDraft.document.pages.end(),
+				std::size_t{ 0u }, [](std::size_t a_total, const std::string& a_page) { return a_total + a_page.size(); });
+			if (totalBytes > 30000u || std::any_of(g_runeforgeReaderDraft.document.pages.begin(), g_runeforgeReaderDraft.document.pages.end(),
+				[](const std::string& a_page) { return a_page.empty(); })) {
+				SKSE::log::warn("Runeforge reader commit rejected: incomplete or oversized inscription.");
+				g_runeforgeReaderDraft = {};
+				return;
+			}
+			document = std::move(g_runeforgeReaderDraft.document);
+			g_runeforgeReaderDraft = {};
+		}
+
+		QueueTask([document = std::move(document)]() mutable {
+			if (!IsGameplayReady()) {
+				SKSE::log::warn("Runeforge reader open rejected: gameplay UI is unavailable.");
+				return;
+			}
+			std::scoped_lock readerLock(g_runeforgeReaderMutex);
+			ResetRuneforgeReaderSessionState();
+			g_runeforgeReaderDocument = std::move(document);
+			g_runeforgeReaderPage = 0;
+			g_runeforgeReaderNeedsPush = true;
+			g_controlPanelOpen.store(false, std::memory_order_release);
+			g_runeforgeReaderOpen.store(true, std::memory_order_release);
+			const auto status = EnsurePrisma(true);
+			if (IsPrismaFailureStatus(status)) {
+				g_runeforgeReaderOpen.store(false, std::memory_order_release);
+				g_runeforgeReaderNeedsPush = false;
+				NotifyPrismaPanelFailureOnce(status);
+				return;
+			}
+			TickRuneforgeReader();
+			SKSE::log::info("Runeforge reader opened substrate={} pages={}",
+				g_runeforgeReaderDocument.substrate, g_runeforgeReaderDocument.pages.size());
+		});
+	}
+
+	// Public entry points (HandleUiCommand, external callers). They post to the same mailbox as the view's buttons, so the
+	// reader has exactly one action path.
+	void StepRuneforgeReader(int a_delta)
+	{
+		if (a_delta == 0) return;
+		PostRuneforgeReaderJsCommand(a_delta < 0 ? RuneforgeReaderContract::kJsPrevious : RuneforgeReaderContract::kJsNext);
+	}
+
+	void CloseRuneforgeReader()
+	{
+		PostRuneforgeReaderJsCommand(RuneforgeReaderContract::kJsClose);
 	}
 }

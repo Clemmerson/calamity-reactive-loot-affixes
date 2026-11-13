@@ -52,6 +52,39 @@
 		});
 	}
 
+	// R8.7.4.14: the reader's keyboard and gamepad input is handled here, on the input-device dispatch, without the JS
+	// view or the SKSE task queue (RuneforgeReaderInputContract.h). Returns true when the batch held gamepad input, which
+	// is consumed so it cannot also reach gameplay or Prisma's own gamepad listener (which would double-step).
+	bool HandleRuneforgeReaderInputBatch(const RE::InputEvent* a_events)
+	{
+		bool sawGamepad = false;
+		for (auto* current = a_events; current; current = current->next) {
+			if (!g_runeforgeReaderOpen.load(std::memory_order_acquire)) {
+				break;
+			}
+			const auto* button = current->AsButtonEvent();
+			if (!button) {
+				continue;
+			}
+			const auto device = button->GetDevice();
+			if (device == RE::INPUT_DEVICES::kKeyboard) {
+				RuneforgeReaderContract::Action action = RuneforgeReaderContract::Action::kNone;
+				{
+					std::scoped_lock lock(g_runeforgeReaderMutex);
+					action = RuneforgeReaderContract::MapKeyboard(
+						button->GetIDCode(), button->IsDown(), button->IsUp(), g_runeforgeReaderCloseKeysArmed);
+				}
+				ApplyRuneforgeReaderAction(action, RuneforgeReaderContract::Source::kKeyboard);
+			} else if (device == RE::INPUT_DEVICES::kGamepad) {
+				sawGamepad = true;
+				ApplyRuneforgeReaderAction(
+					RuneforgeReaderContract::MapGamepad(button->GetIDCode(), button->IsDown()),
+					RuneforgeReaderContract::Source::kGamepad);
+			}
+		}
+		return sawGamepad;
+	}
+
 	[[nodiscard]] bool IsRelevantMenuEvent(const RE::MenuOpenCloseEvent& a_event) noexcept
 	{
 		const char* raw = a_event.menuName.c_str();
@@ -90,7 +123,10 @@
 
 		g_relevantMenusOpen.store(0);
 
-		if (!g_controlPanelOpen.load() && g_api && g_view && g_api->IsValid(g_view)) {
+		// The open reader owns the view's focus; a relevant menu closing must not take it away (that would be a focus
+		// loss, and the reader contract closes on focus loss).
+		if (!g_controlPanelOpen.load() && !g_runeforgeReaderOpen.load(std::memory_order_acquire) &&
+			g_api && g_view && g_api->IsValid(g_view)) {
 			// Keep cursor/focus state in sync with menu lifetime.
 			// If focus remains after menu close, the cursor can linger until reopening a menu.
 			if (g_api->HasFocus(g_view)) {
@@ -114,14 +150,37 @@
 			const Event* a_event,
 			RE::BSTEventSource<Event>*) override
 		{
+			const auto* inputEvent = a_event ? *a_event : nullptr;
+			// The reader is serviced before any hotkey logic, every dispatch (including empty frames), so its mailbox and
+			// focus contract never depend on the task queue or on the configured panel hotkey.
+			if (g_runeforgeReaderOpen.load(std::memory_order_acquire)) {
+				ServiceRuneforgeReader();
+				if (HandleRuneforgeReaderInputBatch(inputEvent)) {
+					return RE::BSEventNotifyControl::kStop;
+				}
+			}
+
 			const auto configuredHotkey = ResolveConfiguredControlPanelHotkey();
 			if (configuredHotkey == 0u) {
 				return RE::BSEventNotifyControl::kContinue;
 			}
 
-			const auto* inputEvent = a_event ? *a_event : nullptr;
 			for (auto* current = inputEvent; current; current = current->next) {
 				const auto* buttonEvent = current->AsButtonEvent();
+				// The full-catalog bypass is compiled out of Release builds.
+#if !defined(NDEBUG)
+				if (kRuneforgeDebugHotkey != configuredHotkey && buttonEvent && buttonEvent->IsDown() &&
+					NormalizeButtonKeyCode(buttonEvent) == kRuneforgeDebugHotkey) {
+					if (RuneforgeMenu::IsOpen()) {
+						RuneforgeMenu::QueueClose(true);
+						return RE::BSEventNotifyControl::kContinue;
+					}
+					if (IsGameplayReady()) {
+						RuneforgeMenu::QueueOpen(true);
+						return RE::BSEventNotifyControl::kContinue;
+					}
+				}
+#endif
 				if (!ShouldToggleControlPanelForButton(buttonEvent, configuredHotkey)) {
 					continue;
 				}
@@ -158,6 +217,20 @@
 				if (menuName == RE::JournalMenu::MENU_NAME) {
 					RefreshControlPanelHotkeyFromMcm(true);
 					RefreshUiLanguageFromMcm(true);
+				}
+			}
+
+			{
+				const char* rawName = a_event->menuName.c_str();
+				const std::string_view menuName = rawName ? std::string_view(rawName) : std::string_view{};
+				bool closeReader = false;
+				if (g_runeforgeReaderOpen.load(std::memory_order_acquire)) {
+					std::unique_lock lock(g_runeforgeReaderMutex, std::try_to_lock);
+					closeReader = lock.owns_lock() && RuneforgeReaderContract::ShouldCloseOnMenuClose(
+						menuName, a_event->opening, true, g_runeforgeReaderFocusConfirmed);
+				}
+				if (closeReader) {
+					CloseRuneforgeReaderOnGameThread(RuneforgeReaderContract::Source::kFocusMenuClosed);
 				}
 			}
 

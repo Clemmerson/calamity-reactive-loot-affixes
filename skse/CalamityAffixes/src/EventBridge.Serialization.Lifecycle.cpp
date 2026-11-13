@@ -1,7 +1,9 @@
 #include "CalamityAffixes/EventBridge.h"
 #include "CalamityAffixes/Hooks.h"
 #include "CalamityAffixes/InstanceKeyTransferPolicy.h"
+#include "CalamityAffixes/LootCurrencySourceHelpers.h"
 #include "CalamityAffixes/PluginEditorIds.h"
+#include "CalamityAffixes/PrismaTooltip.h"
 #include "EventBridge.Loot.Runeword.Detail.h"
 
 #include <algorithm>
@@ -25,6 +27,7 @@ namespace CalamityAffixes
 		}
 		_instanceTrackingState.appliedPassiveSpells.clear();
 		_instanceTrackingState.instanceAffixes.clear();
+		_instanceTrackingState.instanceBaseObjects.clear();
 		_instanceTrackingState.selectedReforgeCounts.clear();
 		_instanceTrackingState.equippedInstanceKeysByToken.clear();
 		_instanceTrackingState.equippedTokenCacheReady = false;
@@ -38,6 +41,13 @@ namespace CalamityAffixes
 		_affixRuntimeState.activeLowHealthTriggerAffixIndices.clear();
 		_instanceTrackingState.instanceStates.clear();
 		_runewordState.ResetSelectionAndProgress();
+		_feasrKnownRunewordRecipeIds.clear();
+		_feasrDiscoveryRevision.clear();
+		_feasrDiscoveryExpectedCount = 0u;
+		_feasrDiscoveryReceivedCount = 0u;
+		_feasrDiscoverySyncActive = false;
+		_feasrDiscoverySyncValid = false;
+		_feasrDiscoveryReady = false;
 		ClearTrapRuntimeState("revert", true);
 		_combatState.ResetCorpseExplosionState();
 		_combatState.ResetTransientState();
@@ -52,6 +62,40 @@ namespace CalamityAffixes
 		Hooks::ClearRuntimeState();
 	}
 
+	void EventBridge::RebuildInstanceBaseObjectIndexFromPlayerInventory()
+	{
+		_instanceTrackingState.instanceBaseObjects.clear();
+
+		auto* player = RE::PlayerCharacter::GetSingleton();
+		if (!player) {
+			return;
+		}
+		auto* changes = player->GetInventoryChanges();
+		if (!changes || !changes->entryList) {
+			return;
+		}
+
+		for (auto* entry : *changes->entryList) {
+			if (!entry || !entry->object || !entry->extraLists) {
+				continue;
+			}
+			const auto baseObjectFormID = entry->object->GetFormID();
+			if (baseObjectFormID == 0u) {
+				continue;
+			}
+			for (auto* xList : *entry->extraLists) {
+				const auto* uid = xList ? xList->GetByType<RE::ExtraUniqueID>() : nullptr;
+				if (!uid || uid->baseID == 0u || uid->uniqueID == 0u) {
+					continue;
+				}
+				const auto key = MakeInstanceKey(uid->baseID, uid->uniqueID);
+				if (HasMaterialInstanceState(key)) {
+					_instanceTrackingState.instanceBaseObjects[key] = baseObjectFormID;
+				}
+			}
+		}
+	}
+
 	void EventBridge::OnPostLoadGame()
 	{
 		const std::scoped_lock lock(_stateMutex);
@@ -59,6 +103,8 @@ namespace CalamityAffixes
 		// already pending when PreLoad/serialization started.
 		_eventDispatcher.Invalidate();
 		(void)NormalizeLegacyPlayerInstanceKeys();
+		RebuildInstanceBaseObjectIndexFromPlayerInventory();
+		ReconcileLoadedPendingDropOwnership();
 		(void)PruneOrphanedPlayerInstanceKeys();
 		// Serialization Load runs before inventory restoration. Always rebuild at
 		// PostLoadGame so normal saves cannot retain an empty/stale equipped cache.
@@ -70,10 +116,64 @@ namespace CalamityAffixes
 	{
 		const std::scoped_lock lock(_stateMutex);
 		_eventDispatcher.Invalidate();
+		_lootState.pendingDropOwnership.clear();
+		_lootState.pendingDropOwnershipOverflow = false;
+		_lootState.pendingDropOwnershipOverflowExpiresAtDay = 0u;
+		_feasrKnownRunewordRecipeIds.clear();
+		_feasrDiscoveryRevision.clear();
+		_feasrDiscoveryExpectedCount = 0u;
+		_feasrDiscoveryReceivedCount = 0u;
+		_feasrDiscoverySyncActive = false;
+		_feasrDiscoverySyncValid = false;
+		_feasrDiscoveryReady = false;
 		ClearTrapRuntimeState("pre-load", true);
 		_combatState.echoStrike.Reset();
 		Hooks::InvalidateDeferredTasks();
 		Hooks::ClearRuntimeState();
+	}
+
+	void EventBridge::ExpirePendingDropOwnership(std::uint32_t a_currentDay)
+	{
+		const auto expired = CalamityAffixes::ExpirePendingDropOwnership(
+			_lootState.pendingDropOwnership,
+			a_currentDay);
+		auto* player = RE::PlayerCharacter::GetSingleton();
+		const auto playerID = player ? player->GetFormID() : 0u;
+		for (const auto key : expired) {
+			if (key == 0u || (playerID != 0u && PlayerHasInstanceKey(key))) {
+				continue;
+			}
+			DiscardInstanceKeyState(key);
+			SKSE::log::warn(
+				"CalamityAffixes: expired unresolved drop ownership; discarded detached state rather than risk stale reattachment (key={:016X}, day={}).",
+				key,
+				a_currentDay);
+		}
+		if (_lootState.pendingDropOwnershipOverflow &&
+			a_currentDay >= _lootState.pendingDropOwnershipOverflowExpiresAtDay) {
+			_lootState.pendingDropOwnershipOverflow = false;
+			_lootState.pendingDropOwnershipOverflowExpiresAtDay = 0u;
+		}
+	}
+
+	void EventBridge::ReconcileLoadedPendingDropOwnership()
+	{
+		const auto currentDay = detail::GetInGameDayStamp();
+		ExpirePendingDropOwnership(currentDay);
+		auto* player = RE::PlayerCharacter::GetSingleton();
+		const auto playerID = player ? player->GetFormID() : 0u;
+		std::erase_if(_lootState.pendingDropOwnership, [&](const auto& a_entry) {
+			if (a_entry.instanceKey == 0u || a_entry.baseObjectFormID == 0u ||
+				!HasMaterialInstanceState(a_entry.instanceKey)) {
+				return true;
+			}
+			if (playerID != 0u &&
+				static_cast<std::uint32_t>(a_entry.instanceKey >> 16u) == playerID &&
+				PlayerHasExactDropPickupIdentity(a_entry.instanceKey, a_entry.baseObjectFormID)) {
+				return true;
+			}
+			return false;
+		});
 	}
 
 	void EventBridge::OnPreSaveGame()
@@ -239,7 +339,16 @@ namespace CalamityAffixes
 		}
 
 		std::uint32_t pruned = 0u;
+		const auto currentDay = detail::GetInGameDayStamp();
 		for (const auto key : materialKeys) {
+			if (_lootState.pendingDropOwnershipOverflow &&
+				currentDay < _lootState.pendingDropOwnershipOverflowExpiresAtDay &&
+				static_cast<std::uint32_t>(key >> 16u) == playerID) {
+				continue;
+			}
+			if (IsPendingDropOrphanProtected(key, _lootState.pendingDropOwnership, currentDay)) {
+				continue;
+			}
 			if (!IsOrphanedPlayerInstanceKey(key, playerID, inventoryKeys.contains(key))) {
 				continue;
 			}
@@ -370,6 +479,9 @@ namespace CalamityAffixes
 		if (key == 0u || !IsInstanceKeyTracked(key)) {
 			return;
 		}
+		std::erase_if(_lootState.pendingDropOwnership, [key](const auto& a_entry) {
+			return a_entry.instanceKey == key;
+		});
 
 		// Safety net: if the instance is already back in the player inventory, don't prune it.
 		if (PlayerHasInstanceKey(key)) {
@@ -418,6 +530,42 @@ namespace CalamityAffixes
 		return false;
 	}
 
+	bool EventBridge::PlayerHasExactDropPickupIdentity(
+		std::uint64_t a_instanceKey,
+		RE::FormID a_baseObjectFormID) const
+	{
+		if (a_instanceKey == 0u || a_baseObjectFormID == 0u) {
+			return false;
+		}
+		auto* player = RE::PlayerCharacter::GetSingleton();
+		auto* changes = player ? player->GetInventoryChanges() : nullptr;
+		if (!changes || !changes->entryList) {
+			return false;
+		}
+
+		std::vector<DropPickupInventoryIdentity> observations;
+		for (auto* entry : *changes->entryList) {
+			if (!entry || !entry->object || entry->object->GetFormID() != a_baseObjectFormID || !entry->extraLists) {
+				continue;
+			}
+			for (auto* xList : *entry->extraLists) {
+				if (!xList) {
+					continue;
+				}
+				const auto* uid = xList->GetByType<RE::ExtraUniqueID>();
+				if (!uid) {
+					continue;
+				}
+				observations.push_back({
+					MakeInstanceKey(uid->baseID, uid->uniqueID),
+					entry->object->GetFormID(),
+					xList->GetCount()
+				});
+			}
+		}
+		return HasUniqueExactDropPickupInventoryIdentity(observations, a_instanceKey, a_baseObjectFormID);
+	}
+
 	void EventBridge::MaybeMigrateMiscCurrency()
 	{
 		// Automatic migration disabled — use MCM "Recover Currency" button instead.
@@ -429,7 +577,15 @@ namespace CalamityAffixes
 		const std::scoped_lock lock(_stateMutex);
 
 		if (_miscCurrencyRecovered) {
-			return "Already recovered this save. / 이미 복구 완료된 세이브입니다.";
+			// Follows the UI language setting like the tooltip text (0 = English, 1 = Korean, 2 = both).
+			switch (PrismaTooltip::GetUiLanguageMode()) {
+			case 0:
+				return "Already recovered this save.";
+			case 1:
+				return "이미 복구 완료된 세이브입니다.";
+			default:
+				return "이미 복구 완료된 세이브입니다. / Already recovered this save.";
+			}
 		}
 
 		auto* player = RE::PlayerCharacter::GetSingleton();

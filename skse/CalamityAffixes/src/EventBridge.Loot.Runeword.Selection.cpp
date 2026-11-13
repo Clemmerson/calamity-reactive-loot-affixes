@@ -41,6 +41,7 @@ namespace CalamityAffixes
 			return false;
 		}
 
+		RememberInstanceBaseObject(a_outInstanceKey, a_outEntry->object->GetFormID());
 		return true;
 	}
 
@@ -75,7 +76,8 @@ namespace CalamityAffixes
 
 	const EventBridge::RunewordRecipe* EventBridge::ResolveSelectedRunewordRecipe(
 		std::uint64_t a_selectedBaseKey,
-		const RunewordRecipe* a_preferredRecipe) const
+		const RunewordRecipe* a_preferredRecipe,
+		bool a_allowCurrentRecipeFallback) const
 	{
 		if (a_preferredRecipe) {
 			return a_preferredRecipe;
@@ -92,7 +94,7 @@ namespace CalamityAffixes
 			return completedRecipe;
 		}
 
-		return GetCurrentRunewordRecipe();
+		return a_allowCurrentRecipeFallback ? GetCurrentRunewordRecipe() : nullptr;
 	}
 
 	void EventBridge::AppendRunewordSelectionRecommendation(

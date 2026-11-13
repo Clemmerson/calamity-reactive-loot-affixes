@@ -13,9 +13,19 @@ namespace CalamityAffixes
 	EventBridge::OperationResult EventBridge::CraftSelectedAffixes(
 		AffixCraftAction a_action, std::uint64_t a_expectedInstanceKey, std::uint64_t a_selectedToken)
 	{
+		return CraftSelectedAffixes(a_action, a_expectedInstanceKey, a_selectedToken, {}, 0u);
+	}
+
+	EventBridge::OperationResult EventBridge::CraftSelectedAffixes(
+		AffixCraftAction a_action,
+		std::uint64_t a_expectedInstanceKey,
+		std::uint64_t a_selectedToken,
+		std::string_view a_expectedAffixSignature,
+		std::uint32_t a_expectedRegularAffixCount)
+	{
 		const std::scoped_lock lock(_stateMutex);
 		auto fail = [](std::string a_message) { return OperationResult{ false, std::move(a_message) }; };
-		if (!_configLoaded || a_expectedInstanceKey == 0u ||
+		if (!_configLoaded || !_runtimeSettings.enabled.load(std::memory_order_relaxed) || a_expectedInstanceKey == 0u ||
 			_runewordState.transmuteInProgress || _runewordState.affixExpansionInProgress) {
 			return fail("Crafting unavailable: select a base and wait for other actions to finish.");
 		}
@@ -83,6 +93,17 @@ namespace CalamityAffixes
 			previous.count != regular.count + (runewordToken != 0u ? 1u : 0u)) {
 			return fail("Crafting failed: conflicting runeword state.");
 		}
+		if (!a_expectedAffixSignature.empty()) {
+			std::string currentSignature;
+			for (const auto token : regular) {
+				if (!currentSignature.empty()) currentSignature.push_back(',');
+				currentSignature += std::to_string(token);
+			}
+			if (currentSignature.empty()) currentSignature = "-";
+			if (regular.count != a_expectedRegularAffixCount || currentSignature != a_expectedAffixSignature) {
+				return fail("Affixes changed; review the current state and try again.");
+			}
+		}
 		if (!detail::CanCraftAffixLayout(a_action, regular.count, prefixCount, suffixCount, hasLegacyAffix)) {
 			return fail("Crafting failed: this base has a legacy affix layout. Use a Scouring Orb to reroll it.");
 		}
@@ -107,7 +128,8 @@ namespace CalamityAffixes
 		const auto currencyId = detail::CraftCurrency(a_action);
 		auto* currency = PluginEditorIds::Lookup<RE::TESObjectMISC>(currencyId.data());
 		if (!player || !currency) return fail("Crafting currency unavailable. Install the matching ESP and DLL.");
-		const auto cost = a_action == AffixCraftAction::kReforge ? detail::kSelectedReforgeCost : 1u;
+		const auto cost = a_action == AffixCraftAction::kReforge ? detail::kSelectedReforgeCost :
+			(a_action == AffixCraftAction::kIdentify ? detail::kIdentifyScrollCost : detail::kScouringOrbCost);
 		const auto ownedBefore = std::max(0, player->GetItemCount(currency));
 		if (static_cast<std::uint32_t>(ownedBefore) < cost) return fail("Not enough crafting currency.");
 
@@ -253,7 +275,8 @@ namespace CalamityAffixes
 	{
 		const std::scoped_lock lock(_stateMutex);
 		auto fail = [](std::string a_message) { return OperationResult{ false, std::move(a_message) }; };
-		if (!_configLoaded || _runewordState.transmuteInProgress || _runewordState.affixExpansionInProgress) {
+		if (!_configLoaded || !_runtimeSettings.enabled.load(std::memory_order_relaxed) ||
+			_runewordState.transmuteInProgress || _runewordState.affixExpansionInProgress) {
 			return fail("Exchange unavailable: wait for other actions to finish.");
 		}
 		// Same item-mutation guard as crafting, so a trade cannot interleave with a
@@ -342,6 +365,7 @@ namespace CalamityAffixes
 		}
 
 		const bool hadAffixes = _instanceTrackingState.instanceAffixes.erase(instanceKey) > 0u;
+		_instanceTrackingState.instanceBaseObjects.erase(instanceKey);
 		_instanceTrackingState.selectedReforgeCounts.erase(instanceKey);
 		const bool hadRuntimeState = std::ranges::any_of(
 			_instanceTrackingState.instanceStates,
