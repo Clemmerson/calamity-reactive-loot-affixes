@@ -63,7 +63,7 @@
     }
   },
   "history_audit": {
-    "scope": "Inherited upstream history: 7,190 blobs previously scanned. Final candidate adds 80 blobs scanned for high-confidence secret patterns and private permission reference IDs; final manifest content checked separately.",
+    "scope": "Inherited upstream history: 7,190 blobs previously scanned. Final candidate adds 81 blobs scanned for high-confidence secret patterns and private permission reference IDs; final manifest content checked separately.",
     "result": "No high-confidence token/private-key patterns or private permission reference IDs found."
   },
   "permission_scope": "Author permission is confirmed by the project owner for the described Runeforge expansion, including modified Calamity source and DLL, with Eutkyu credit, original Nexus link, and FEASR-specific support routing. No blanket upstream-code license or unrelated asset clearance is asserted.",
