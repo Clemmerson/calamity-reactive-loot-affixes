@@ -1,7 +1,7 @@
 
 
 # Repo Agent Instructions
-사용자와 한국어로 대화합니다.
+Communicate with the user in English by default; retain Korean when quoting or editing Korean source material.
 
 ## Required fields (repo-local AGENTS.md)
 
@@ -14,7 +14,7 @@
 
 ## Paths
 
-- Repo root: `/home/kdw73/Calamity - Reactive Loot & Affixes`
+- Repo root: the repository root (`.`); do not rely on a machine-specific absolute path.
 - Preferred symlink: `Optional no-space alias via CAFF_REPO_RUN_ROOT` (scripts auto-create a temporary alias when needed)
 - SKSE project: `skse/CalamityAffixes/`
 - Output DLL: `Data/SKSE/Plugins/CalamityAffixes.dll`

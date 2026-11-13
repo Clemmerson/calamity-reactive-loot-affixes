@@ -1,10 +1,15 @@
-# FEASR Runeforge — Calamity 2 source fork
+# Calamity — FEASR Runeforge Fork
 
-**A FEASR-maintained source fork for the Runeforge expansion.** This is a community fork of **Calamity — Reactive Loot & Affixes** by **Eutkyu**. It is not an official Calamity release.
+**Authorized Skyrim SE/AE source modification.** This English-documented fork extends **Calamity 2** by **Eutkyu** for the Runeforge project in **Fettered Existence — A Skyrim Redux**. FEASR integration is maintained by **Clemmerson**.
 
-- Original mod: [Calamity 2 — Reactive Loot and Affixes on Nexus Mods](https://www.nexusmods.com/skyrimspecialedition/mods/193193)
+It includes native Runeforge workstation and menu integration, source-level compatibility work, and independently maintained source builds. The source baseline is **Calamity 2.2.8** at upstream commit [`989f215e81f3595dc4526a1311437946646a998a`](https://github.com/servaltullius/calamity-reactive-loot-affixes/commit/989f215e81f3595dc4526a1311437946646a998a). It does **not** include later Calamity 2.3.x changes. Current status: **development / pre-release**; no binary release is published, and RC1 gameplay certification remains on hold.
+
+- Original author: **Eutkyu**
+- FEASR integration: **Clemmerson**
 - Original source: [servaltullius/calamity-reactive-loot-affixes](https://github.com/servaltullius/calamity-reactive-loot-affixes)
+- Original mod: [Calamity 2 — Reactive Loot and Affixes on Nexus Mods](https://www.nexusmods.com/skyrimspecialedition/mods/193193)
 - FEASR-specific technical support: open an issue in this repository and identify the installed DLL as the **FEASR version of `CalamityAffixes.dll`**.
+- Original Korean Calamity README: [README.ko.md](README.ko.md)
 
 ## What this fork contains
 
@@ -25,4 +30,4 @@ The permission is scope-specific. It does not clear unrelated external, voice, o
 - [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt) retains the upstream library notices.
 - [SUPPORT.md](SUPPORT.md) explains where to report FEASR and upstream issues.
 
-For the original Calamity player documentation, downloads, and non-FEASR support, use Eutkyu's [Nexus page](https://www.nexusmods.com/skyrimspecialedition/mods/193193).
+For English documentation and the preserved Korean technical material index, start at [docs/INDEX.md](docs/INDEX.md). For the original Calamity player documentation, downloads, and non-FEASR support, use Eutkyu's [Nexus page](https://www.nexusmods.com/skyrimspecialedition/mods/193193).

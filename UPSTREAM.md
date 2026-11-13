@@ -11,7 +11,7 @@ The fork keeps the upstream commit as an ancestor. It does not rewrite upstream 
 
 ## Permission and required credit
 
-The project owner confirms that Eutkyu authorized publication of the Runeforge expansion, including modified Calamity source code and DLLs. The author requested:
+On October 8, 2026, Eutkyu authorized publication of the Runeforge expansion, including modified Calamity source code and DLLs. The project owner has recorded this written permission in the private permissions ledger. The author requested:
 
 - Credit to Eutkyu.
 - A link to the original Calamity 2 Nexus page.
