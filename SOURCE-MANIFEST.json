@@ -63,7 +63,7 @@
     }
   },
   "history_audit": {
-    "scope": "Inherited upstream history: 7,190 blobs previously scanned. Final candidate adds 79 blobs scanned for high-confidence secret patterns and private permission reference IDs; final manifest content checked separately.",
+    "scope": "Inherited upstream history: 7,190 blobs previously scanned. Final candidate adds 80 blobs scanned for high-confidence secret patterns and private permission reference IDs; final manifest content checked separately.",
     "result": "No high-confidence token/private-key patterns or private permission reference IDs found."
   },
   "permission_scope": "Author permission is confirmed by the project owner for the described Runeforge expansion, including modified Calamity source and DLL, with Eutkyu credit, original Nexus link, and FEASR-specific support routing. No blanket upstream-code license or unrelated asset clearance is asserted.",
@@ -138,7 +138,7 @@
       "status": "A",
       "path": "docs/AFFIX_CATALOG.en.md",
       "bytes": 3633,
-      "sha256": "eb5b4671dee8fec75233bb04b35af151e89d1b4b8cb3fe1e06ec4f212402c19e"
+      "sha256": "8e5cd4eb9487834cdc2b79a3d9f685745cce747c031d505ab19eb98f29b4a72d"
     },
     {
       "status": "A",

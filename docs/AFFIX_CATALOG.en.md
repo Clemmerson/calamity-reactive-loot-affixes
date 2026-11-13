@@ -4,9 +4,9 @@
 > The Korean generated source remains unchanged. Counts below describe the pinned
 > source catalog; they do not certify that every gameplay path passed RC1 QA.
 
-Updated: 2026-10-09  
-Baseline: `v2.2.8`  
-Source: `affixes/affixes.json`  
+- Updated: 2026-10-09
+- Baseline: `v2.2.8`
+- Source: `affixes/affixes.json`
 Internal entries are omitted from the public catalog.
 
 This overview summarizes the affix structure visible to players. See the detailed
