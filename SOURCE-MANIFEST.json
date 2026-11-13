@@ -1,0 +1,808 @@
+{
+  "schema": "feasr.calamity-source-manifest.v2",
+  "project": "FEASR Runeforge source fork for Calamity 2",
+  "status": "source candidate; clean build completed; no binary release or gameplay certification",
+  "upstream": {
+    "repository": "https://github.com/servaltullius/calamity-reactive-loot-affixes",
+    "author": "Eutkyu",
+    "original_mod": "https://www.nexusmods.com/skyrimspecialedition/mods/193193",
+    "baseline_version": "2.2.8",
+    "baseline_commit": "989f215e81f3595dc4526a1311437946646a998a",
+    "observed_main_commit": "f08957392f0f5aea2d551f2194a6fffefdaa4dbb",
+    "newer_upstream_commits_merged": false
+  },
+  "feasr_source": {
+    "candidate_branch": "feasr/pc1.2-public-prep",
+    "pinned_review_base_branch": "release/feasr-pc1.2",
+    "stable_branch": "feasr/pc1.2",
+    "source_revision_commit": "207d39108a816122205d7bc6eaec829d4d3428a4",
+    "source_revision_tree": "7283008a3143a6546250791ed4776a0fc443c9f0",
+    "native_source_file_count": 296,
+    "changed_paths_from_baseline": 123,
+    "path_summary": {
+      "added": 67,
+      "modified": 56,
+      "deleted": 0
+    },
+    "commits": [
+      {
+        "commit": "6ba338b",
+        "description": "FEASR PC1.1 source reconstruction; excludes unaccepted duplicate-equipped-Runeword suppression and unverified recipe/base compatibility restriction"
+      },
+      {
+        "commit": "0c75027",
+        "description": "Accepted PC1.2 workstation readiness refinement"
+      },
+      {
+        "commit": "207d391",
+        "description": "Register accepted FEASR native source units in CMake"
+      }
+    ]
+  },
+  "builds": {
+    "accepted_pc1_2": {
+      "sha256": "b987160bc406bef8dd773db6ac6b59684d311bcea9e5b9f06f847fc4d7a32dd4",
+      "bytes": 3963392,
+      "package_sha256": "43ed69021be5f155d419fdd5feb7b131c5158b1c3841c76c054bfd4965a6d068",
+      "provenance": "accepted build reused most PC1.1 objects; recompiled workstation translation unit"
+    },
+    "independent_clean_build": {
+      "status": "success; full clean compile and link",
+      "date": "2026-11-13",
+      "compiler": "Clang/clang-cl 19.1.7",
+      "linker": "lld-link",
+      "msvc_headers": "14.44.35207",
+      "windows_sdk": "10.0.26100.0",
+      "commonlib_commit": "b6e0c134b08a2108300c8d033c3b81860ce62354",
+      "sha256": "03ea6d92e41a984a156cbd91307e9383d1745bb4c5d5d0707a9b395290915f6c",
+      "bytes": 3960832,
+      "matches_accepted_binary": false,
+      "difference_note": "PE sections differ beyond timestamp; accepted build reused objects while clean build recompiled all translation units and CommonLibSSE-NG. Exact per-object cause not isolated."
+    }
+  },
+  "history_audit": {
+    "scope": "All reachable inherited upstream history was previously scanned (7,190 blobs); this candidate reconstruction adds a fresh scan of 66 blobs.",
+    "result": "No high-confidence token/private-key patterns or private permission reference IDs found."
+  },
+  "permission_scope": "Author permission is confirmed by the project owner for the described Runeforge expansion, including modified Calamity source and DLL, with Eutkyu credit, original Nexus link, and FEASR-specific support routing. No blanket upstream-code license or unrelated asset clearance is asserted.",
+  "changed_files": [
+    {
+      "status": "A",
+      "path": "BUILDING.md",
+      "bytes": 3384,
+      "sha256": "fac50171f7691469b96d87cf1aec16af5e697f0d226d31f2228014c7220bfd9c"
+    },
+    {
+      "status": "A",
+      "path": "CHANGELOG-FEASR.md",
+      "bytes": 1772,
+      "sha256": "1886f65cc9ddcb6073ee4b23a80e76318eeb285392e84433f4f398245a4f8406"
+    },
+    {
+      "status": "A",
+      "path": "COMPATIBILITY.md",
+      "bytes": 1661,
+      "sha256": "183854e7304960efa8473969c4ce7366ce62de084570d2e69b1b05836939b7f9"
+    },
+    {
+      "status": "A",
+      "path": "FEASR-CHANGE-INVENTORY.md",
+      "bytes": 8959,
+      "sha256": "190c6941a350b10dd996e4f0a39e37c910d7c307cd61434bb8018b75cd983b37"
+    },
+    {
+      "status": "M",
+      "path": "README.md",
+      "bytes": 2611,
+      "sha256": "84ebe773b4355347bb86c18b3b4e12b726dbfbb2010aa83aeb94b33ef3320958"
+    },
+    {
+      "status": "A",
+      "path": "REPOSITORY-METADATA.md",
+      "bytes": 1947,
+      "sha256": "b558049c0b5aefc06587de005f933a277d31c215fd7ddde838dee33283789c45"
+    },
+    {
+      "status": "A",
+      "path": "SUPPORT.md",
+      "bytes": 877,
+      "sha256": "c0fdb6ebde1bf8f853027968e8c8227ce8f2db0d7966de3054ca75318bd9d334"
+    },
+    {
+      "status": "M",
+      "path": "THIRD_PARTY_NOTICES.txt",
+      "bytes": 10481,
+      "sha256": "927fe129b3277c95ee537e2ea8ee1df80648d9ed66fd3bf4121cc92f83522bcb"
+    },
+    {
+      "status": "A",
+      "path": "UPSTREAM.md",
+      "bytes": 1657,
+      "sha256": "e45a1f97250bedbe84aef26223b1ec64dc33ed2ae2d5fbc9b807ce37ef25d302"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/CMakeLists.txt",
+      "bytes": 13222,
+      "sha256": "344d1bd5a21b9c9f8f8d11a27361828f7509c21afc407c26f84db621e4f7124d"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/AffixCraftingPolicy.h",
+      "bytes": 7128,
+      "sha256": "71fb6879c57ef76782f99d76ddce8fec627e4b365d9c441c7f2179d09e4ecffc"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/DropPickupInventoryIdentityPolicy.h",
+      "bytes": 2327,
+      "sha256": "70d98bb03cca1f81e02be9f7ae8d883def1a0df675fce47c6ec31f2e38d090ce"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/DropPickupOwnershipPolicy.h",
+      "bytes": 7677,
+      "sha256": "454e8d3662a768bb9708eb575baa7b494f4f707df9050136667e225dccdee971"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/DropReferenceIdentityPolicy.h",
+      "bytes": 1912,
+      "sha256": "25dddbe1b11a112a83931156dd6441cb730043a8e853541bc0f2bb67212f431b"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/EventBridge.h",
+      "bytes": 7528,
+      "sha256": "4babeabe84852c6ed915cf3e877b91f04127d39b204ea5611beea2bc00d0ff4c"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/EventNames.h",
+      "bytes": 2496,
+      "sha256": "2079c7a7b26bb4d726493055196f427de9c1739f8bd21243de1191040401794b"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/IdentificationRitualPolicy.h",
+      "bytes": 3329,
+      "sha256": "68d575ae06a68f01886e52e7987b22bd9d99c2eec811ab14ac0da7a9fb56513b"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/InstanceKeyStateMapTransfer.h",
+      "bytes": 1364,
+      "sha256": "2209c0e251bdf071910bcba2650eaa2ae9d0e33da61cd2f74bfc308a7a08bfb7"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/InstanceKeyTransferPolicy.h",
+      "bytes": 7040,
+      "sha256": "a9a54c8cbd39a67cb6f3e09fbceff9a42fbd7d7d04fe56b8940748d22f6032f3"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/LootRerollGuard.h",
+      "bytes": 3938,
+      "sha256": "043927a88b2c80f8169834fd9a5fc77a5f3bdefeedc8233c13c9a0ad5aebf1fe"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/LootRuntimeState.h",
+      "bytes": 3312,
+      "sha256": "5ad9fd3e819bfdefd847c622234010658117744cff4b53a229b0d5a544b0ad83"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/PrismaTooltip.h",
+      "bytes": 502,
+      "sha256": "10530dffc0eef189743142a70aa07b05b932449eb5e6c9bf2bf91b10eb949b5f"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RuneforgeActivationIntentPolicy.h",
+      "bytes": 3517,
+      "sha256": "6190b1a6fd650f93d1fb9c1a2144f0ad3069ac7386925263dbefcdabb4764399"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RuneforgeInventorySnapshotPolicy.h",
+      "bytes": 2063,
+      "sha256": "3c3e954cdc440d4e6d0e7ea069013b2579ad44ff3d2164daa95fea8306af231d"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RuneforgeMenu.h",
+      "bytes": 179,
+      "sha256": "a0f2e43bdeab6a27f4797d7ae590bb6f867ede33e93e52420b3ed51c1d100232"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RuneforgeMenuCallbackPolicy.h",
+      "bytes": 7888,
+      "sha256": "be1cf8ae936e27645b2121bf598c0fce911c11a09788c7dd3242a6217378c4b2"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RuneforgeMenuOpenPolicy.h",
+      "bytes": 1794,
+      "sha256": "ef87919d9ad6c602affc58f846932a15de15b1a3880443c4a59979226999cc6b"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RuneforgeMenuOperations.h",
+      "bytes": 2142,
+      "sha256": "f74338058f40e708de0598e50b0b11e73fb58d02e8f84fb16d1d8b33d1ae317e"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RuneforgeMenuRacePolicy.h",
+      "bytes": 655,
+      "sha256": "52e20d690e2434a89683e10616a1b924b78b05d661b7ea4ccd6c7db9a5ca15d3"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RuneforgePresentation.generated.h",
+      "bytes": 17539,
+      "sha256": "9a1102d0db0cbea106cd10a42e9da22df5b3f269637976f1985bc8ab79976c00"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RuneforgePresentation.h",
+      "bytes": 16118,
+      "sha256": "7be5db83683c3b7bde4a703eda4fa970ea7a8ebab57f6c610cf749e8e50f85f4"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RuneforgeReaderInputContract.h",
+      "bytes": 10778,
+      "sha256": "732612b1ebaf6bf565d2ec96041840385fc86218cbdb5bd500306e24e7f2e1ec"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RuneforgeWorkstation.h",
+      "bytes": 1683,
+      "sha256": "50094d85fe86bf1b6ecd32d3eeba3ec2f00b8759bfebdbe104a2aa2fd3f47c05"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RuneforgeWorkstationCompletionPolicy.h",
+      "bytes": 1096,
+      "sha256": "1ae536feaeeb9791365d4c967c5a770efc3c5bc4c96db4157eb57bd28175a857"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RuneforgeWorkstationContextPolicy.h",
+      "bytes": 4596,
+      "sha256": "04ae4d37abf8f2005e62231ff97568e20a6f78e3afed36f97d9103f09abc2f55"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RuneforgeWorkstationControlsPolicy.h",
+      "bytes": 9723,
+      "sha256": "1cc089f3b0cb17b49b6ef037cff55b93115561b69ffb2470b207e97718dbc2b0"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RuneforgeWorkstationExitSettlementPolicy.h",
+      "bytes": 3948,
+      "sha256": "543874b2d0332f8cab76754df541d67232d729dbfe485f425b245d369cf918c6"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RuneforgeWorkstationFramingPolicy.h",
+      "bytes": 10637,
+      "sha256": "f63bf5bf5cc0fa3c1560346ef4734d57dd12de964d4bbaeff7bbd2c37c67adcb"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RuneforgeWorkstationFreeCameraLayout.h",
+      "bytes": 6722,
+      "sha256": "ce54f33358b8dcdb10bf59d205c8fe032ba3467204d8a26acc1dd71f42b49405"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RuneforgeWorkstationInputPolicy.h",
+      "bytes": 12609,
+      "sha256": "be90f6092ff408442eb17e042a36967e751d255e3483dda52e00e1e477835fb8"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RuneforgeWorkstationLayoutPolicy.h",
+      "bytes": 10579,
+      "sha256": "191d1df481c9dee1d25433886d10942e5ca8f48ab683b57fbac1715a223fdafe"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RuneforgeWorkstationLeasePolicy.h",
+      "bytes": 4733,
+      "sha256": "9586cb4b1913dfdd0792e3e6c3ea109425677d02cac4a9fec1e176265c4cced3"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RuneforgeWorkstationPromptPolicy.h",
+      "bytes": 12535,
+      "sha256": "91bf3b7fd86f85ead36d506f015e3cfbf7b3cb39cbc2a7ba2aa8b70c3587e3de"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RuneforgeWorkstationProtocolPolicy.h",
+      "bytes": 15530,
+      "sha256": "8bbd5106d4550ad320295957ccda79c6030979cec962a4f5227f2f9465cf1aa8"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RuneforgeWorkstationReadinessPolicy.h",
+      "bytes": 6309,
+      "sha256": "8502a60b86860fd81dea4238f17935899cf7e8c6435a78f51f05af1ad8104e57"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RuneforgeWorkstationSeatPolicy.h",
+      "bytes": 15185,
+      "sha256": "44d8adb3a4c1154c871e173f02c57477855fff5b3a868a46e3db34696a118514"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RuneforgeWorkstationShotPolicy.h",
+      "bytes": 6590,
+      "sha256": "a33bf9874886314f77e1084bdb28f8db34ef8314899005b6c3ee98c3c0e9ff61"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RuneforgeWorkstationSnapshotContract.h",
+      "bytes": 9602,
+      "sha256": "a4c564c56c34f7745b4b7eb6fa66a8a292508e8ea75269625c65f7c8efa6e91d"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RuneforgeWorkstationStagePolicy.h",
+      "bytes": 6246,
+      "sha256": "487d8a0273c409147b119db5bb8d0f8489ad8521e16299f6ae04b0f084deaa03"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RuneforgeWorkstationStatePolicy.h",
+      "bytes": 36274,
+      "sha256": "33d97654826f51e3cd6c45c7b12ca31a3f78226df64859435d17cd754c3e981b"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RuneforgeWorkstationSweepPolicy.h",
+      "bytes": 3126,
+      "sha256": "39e0167d42df1753f75933070f765119d006534f151bd5b65562f39c76f67de4"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RuneforgeWorkstationUiOwnershipPolicy.h",
+      "bytes": 6088,
+      "sha256": "2d4579461e2b445867334978467ad798097c6a5318344f1375d516f58ef54cbc"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RuneforgeWorkstationViewPolicy.h",
+      "bytes": 2530,
+      "sha256": "6e39e3598f130a704bad9f291f4b4829ef6d7179c1b24615afefc4bb81f9621b"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RunewordContractCompatibilityPolicy.h",
+      "bytes": 1671,
+      "sha256": "4b9b7f478a7ea10d339b0cddd4d4ba9635f58c9fd54842e922850c6ddd41b9c7"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RunewordEffectCardPolicy.h",
+      "bytes": 40227,
+      "sha256": "5c448e8f23dac8fc63d41fb020f56db30a61c10da21bfc7a7c70c466037a0674"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RunewordEffectDetailPolicy.h",
+      "bytes": 2615,
+      "sha256": "346df344a05bd565776ea6f8606b5ab9792f14e8bf03b322bf024b410a9916fa"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RunewordRuneWeights.h",
+      "bytes": 751,
+      "sha256": "6745d551512110509dc8020eada178a5374d90079a5e30253a0b4afd80f1ff6b"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RunewordUiContracts.h",
+      "bytes": 6997,
+      "sha256": "35f79daa9eafb3877e182137d9cc6d6656057e8a898efd7da10bee9569e79359"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RunewordUiPresentation.h",
+      "bytes": 2939,
+      "sha256": "17d7a359463f277eddbd6be7c1e6815ba0dcb544f19087271f5845e782254ac4"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/RuntimeContractDocumentPolicy.h",
+      "bytes": 538,
+      "sha256": "bc795c4c0b309dbd002780317d201e478d9842f480683162d7c710c886ebb3be"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/SerializationCurrentRecordReader.h",
+      "bytes": 4560,
+      "sha256": "6e86414b87841b0d93c1c78524ef3590061347d1eb1766e48a8d900e7eb1766c"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/SerializationWireContract.h",
+      "bytes": 13743,
+      "sha256": "6713d47deb1e171cd6f5c692ffefb5e196179a9452f0898f47c25982e178eb05"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/detail/EventBridge.Constants.inl",
+      "bytes": 7251,
+      "sha256": "bf33d50ba8f2b306130ccd25496a7f33e10cb719c5c013b29db00e02dbabe7a7"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/detail/EventBridge.PrivateApi.inl",
+      "bytes": 35671,
+      "sha256": "b2a24679dd182a1c69fae107df40038343c62b92ffeeb411e45bfa98682c0acd"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/detail/EventBridge.PublicApi.inl",
+      "bytes": 9343,
+      "sha256": "3f14eea753a074fafe9783be233d99f527a15bb26ac9442c6b06aa4777ca89ab"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/detail/EventBridge.StateGroups.inl",
+      "bytes": 3345,
+      "sha256": "140d3836c6d26bcc4a7efa599b0ed2c5ebe92162702cf441c91fe740724bf180"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/include/CalamityAffixes/detail/EventBridge.Types.inl",
+      "bytes": 22211,
+      "sha256": "edc561dcf91c492e97145e989971d727d4f0b1b2953dfd476ead56769ec4f851"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/EventBridge.Config.AffixParsing.cpp",
+      "bytes": 20303,
+      "sha256": "fc7e63a05faacc4aa5e53de72a80f85f7f81dc9d11c39e7064b9d9c1ab3bf2e0"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/EventBridge.Config.AffixRegistry.cpp",
+      "bytes": 956,
+      "sha256": "00778d8c4558ffa6f11e0ac42d1d66e9b5b4ba0a4cecfafd8d33555701fe5d6a"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/EventBridge.Config.RunewordSynthesis.cpp",
+      "bytes": 5081,
+      "sha256": "cfc2fafc0b28fbd0298d94017a01f688cee0938d0f311071ca0b76fccd9b6a3d"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/EventBridge.Events.cpp",
+      "bytes": 7393,
+      "sha256": "43c5e9af074463b9a8b5124244e443b408c04381af4b1587e3d39c6d4e1ee153"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/EventBridge.Loot.Assign.cpp",
+      "bytes": 15367,
+      "sha256": "6fc283984857f4110ceb2c944911e90cb81b35b83a3f890aea178f7b2c759cfd"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/EventBridge.Loot.Runeword.BaseSelection.cpp",
+      "bytes": 12537,
+      "sha256": "506248844e4c6d4cf00adbd497309a2c8578d3ea23a6b180c6f2e894a1103f8f"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/EventBridge.Loot.Runeword.Catalog.cpp",
+      "bytes": 20266,
+      "sha256": "206f4d264edbdcf3f43d4b5261b336a1423b463c220e79e29e5150a8eb585aeb"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/EventBridge.Loot.Runeword.Crafting.cpp",
+      "bytes": 10207,
+      "sha256": "00cf61005bf709e4b3c4b1255c4191eda7b271d5282f9336f6291aa7be54c806"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/EventBridge.Loot.Runeword.Detail.cpp",
+      "bytes": 6416,
+      "sha256": "af513db1d91f60d6279100b40e327b97b14dd36b99823459ca390c03581af56e"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/EventBridge.Loot.Runeword.Expand.cpp",
+      "bytes": 14943,
+      "sha256": "e812628d6371cd559b16a98ff094607499a5c99cf7526b1ec0c2396d68a89e4c"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/src/EventBridge.Loot.Runeword.InventoryPreparation.cpp",
+      "bytes": 4731,
+      "sha256": "19f524af07bc26c32614a6b8f42b7d495fd99e6d90e94613b64bcf531ab9fa72"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/EventBridge.Loot.Runeword.PanelState.cpp",
+      "bytes": 26636,
+      "sha256": "0906550ec3684fc026e67cc616a57d5c0fc1869de7e2d711fd842981a04c08f3"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/EventBridge.Loot.Runeword.Policy.cpp",
+      "bytes": 2751,
+      "sha256": "7e8ea46657c89ffa6c61970ec72d852ac8f430274449bbb45240d439aaaedf64"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/src/EventBridge.Loot.Runeword.Presentation.cpp",
+      "bytes": 2199,
+      "sha256": "e947aeb660e3486ee7551790ffc9419c7038fcfaeaf6e2d36bd75c1894d0a958"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/EventBridge.Loot.Runeword.RecipeEntries.cpp",
+      "bytes": 51132,
+      "sha256": "cba1a54464f00d50899385308fcee1a97c7a53da4472ec71f9636a0b8023a3c5"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/EventBridge.Loot.Runeword.RecipeUi.cpp",
+      "bytes": 3404,
+      "sha256": "ecfe32213f258f5cdaf49af50aa92c581d291f647ef6c9fc4f558ee26afd0dbf"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/EventBridge.Loot.Runeword.Reforge.cpp",
+      "bytes": 20988,
+      "sha256": "708103322e287d4b8e94c9f12a4f2a98a3fccc1470392e412e78b1c395f7bb44"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/EventBridge.Loot.Runeword.Selection.cpp",
+      "bytes": 3894,
+      "sha256": "82de890a49427e2619eda4666ed451b754860ec74c05ae681799824d9505e202"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/EventBridge.Loot.Runeword.Transmute.cpp",
+      "bytes": 19818,
+      "sha256": "0127902c29f7dbc2ea9ec383db90e447dec65a26dadaf8c9bd7bda4178ebf47d"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/EventBridge.Loot.Service.cpp",
+      "bytes": 18977,
+      "sha256": "8063e58f50041db1492ed8890bc25fced92e1631065c072394de09cf1cf9daa4"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/EventBridge.Loot.TooltipResolution.cpp",
+      "bytes": 28719,
+      "sha256": "1534ab49923be26dfd0e18b299b45fe871e01b47071c5591d0716cd317ce1f87"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/EventBridge.Loot.cpp",
+      "bytes": 57964,
+      "sha256": "539c5ef1d67f571ed7d2923551651698ca8d01f96e2027d2256670fd3e952301"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/EventBridge.Serialization.Lifecycle.cpp",
+      "bytes": 19951,
+      "sha256": "090969ae414d6baa9abcc06829d854e8717e64f264b0b061917602c83a5cb33b"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/EventBridge.Serialization.Load.Records.inl",
+      "bytes": 24795,
+      "sha256": "c1908feddbc5c6f47b8f5127fed5896e78908475a446fb4a37eeae1dd9e17a87"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/EventBridge.Serialization.Load.cpp",
+      "bytes": 5152,
+      "sha256": "41223bb3aeea1c3c0c6a24118c39e5602206d9211fd347c0c1fb4a8547f84590"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/EventBridge.Serialization.Save.cpp",
+      "bytes": 9011,
+      "sha256": "cd93604de3a6efc329238688d7cd137a805c2aab454dd964c8905433aff2605b"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/EventBridge.Triggers.ActivateEvent.cpp",
+      "bytes": 7756,
+      "sha256": "84aa0bf4d010320f5c8e394f1afa3ca2aff1e7f36b26c86d60ff74d65c003d52"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/EventBridge.Triggers.ModCallback.Handlers.cpp",
+      "bytes": 21243,
+      "sha256": "b0b16c6c6a7aa2a99f5ae4ede9180acf58b0bc91809c94a947e2bc1245357a9e"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/EventBridge.Triggers.ModCallback.cpp",
+      "bytes": 3871,
+      "sha256": "cb4e4d500bc53f4b12697a36e0d1ae5028fa7bc419d45337f988de15ad29dd8a"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/Papyrus.cpp",
+      "bytes": 1986,
+      "sha256": "6d34f31804b68a2494adf78ad43c4d758a04449e3e6d9ed770ac5e553192a24c"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/PrismaTooltip.HandleUiCommand.inl",
+      "bytes": 15601,
+      "sha256": "656672a2f7fcc2567401aa37d70ded1a69c36296fe131dbf1c4fc93f7449a70e"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/PrismaTooltip.MenuInput.inl",
+      "bytes": 8249,
+      "sha256": "03bbe94862ac3706c98399c8709a4e8171cb40e9c2806fda939dcd23677c5975"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/PrismaTooltip.PanelData.inl",
+      "bytes": 17000,
+      "sha256": "5a1227f6148e6da9fb91723706401502db0aa449630ce9efa5353f9b2f93e414"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/PrismaTooltip.SettingsLayout.inl",
+      "bytes": 22489,
+      "sha256": "ac5c77b17f9e5c9be4ad992b7ec274aeccf83befe8d06e742e080291496a638d"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/PrismaTooltip.SharedState.inl",
+      "bytes": 9151,
+      "sha256": "8b11e1abb6c44bebd37b1b4d225bcb1d06768097d572104ab9a57eae68dd762f"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/PrismaTooltip.Tick.inl",
+      "bytes": 6104,
+      "sha256": "186d8f6458b5a8a461489eb5656d930a5c0f7e0b27ea26e09716763fb8f877c3"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/PrismaTooltip.ViewLifecycle.inl",
+      "bytes": 20163,
+      "sha256": "9a195e87507b46db712fa60f4c4f7fffde4d4d9cee82c9e6726224ff7c77c3f1"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/PrismaTooltip.cpp",
+      "bytes": 14891,
+      "sha256": "8da12b7abb0bbc1581b4e5d288e90c815a4fa5a3a92090982601ff2a283ca68a"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/src/RuneforgeMenu.cpp",
+      "bytes": 51763,
+      "sha256": "522c9ba94338063be2690f45b9a7c79a1ab4bd9d0cc930edf4c381ef391907ca"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/src/RuneforgeWorkstation.cpp",
+      "bytes": 183096,
+      "sha256": "fd78cbf216fb2408e1eb295a7d94967792e76701495e061055a8b50bcc2a502f"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/RunewordContractSnapshot.cpp",
+      "bytes": 6940,
+      "sha256": "5482d0014460a1d13aa33fcec67b7a83daa862411a5301c37097f326bf2296f5"
+    },
+    {
+      "status": "M",
+      "path": "skse/CalamityAffixes/src/main.cpp",
+      "bytes": 5705,
+      "sha256": "5ebe797018520049661f5b7e655de088c1ab03aac2411f7b4efc7507110cbbfe"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/tests/data/runeforge-snapshot-shape.v1.json",
+      "bytes": 4095,
+      "sha256": "3f770020bc44fea38f9f0353c7913113f8e220880ed4c362e81be424e9d8a96c"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/tests/data/workstation-vectors.txt",
+      "bytes": 453823,
+      "sha256": "749eebf662a93d6ad69ffc42851537b02d8bfe1bbc0d38c72c1e4841291ff0e6"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/tests/data/workstation-vectors.v1.txt",
+      "bytes": 453946,
+      "sha256": "df5bea7df2c97ff5b6e7112eb4df1d92b249261202e173ba44696d2661485d96"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/tests/data/workstation-vectors.v2.txt",
+      "bytes": 566256,
+      "sha256": "2def8b5cfc7b48126e6b4fe45032a03e930e316c8669ee881870ddc230760945"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/tests/data/workstation-vectors.v3.txt",
+      "bytes": 661816,
+      "sha256": "15a104c2dec6b0f45189a3d946185f8ad90ef9040c107b16401b8f9af5c0e051"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/tests/run_runeforge_workstation_checks.sh",
+      "bytes": 4258,
+      "sha256": "987f1ea679e333b79f7d1a43dd1f9b7d3747d738c3df2a963510c9e3221f790d"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/tests/runeforge_back_input_static_test.py",
+      "bytes": 2074,
+      "sha256": "824a9cd5a2104899a7fa17b4cde8cd7e5d99d83761642b9d810b254a0edcfd37"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/tests/runeforge_effect_card_static_test.py",
+      "bytes": 7351,
+      "sha256": "812283410924e6ef47e11b24f3437daa2cd5bc1008d17a8486d733662369adf1"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/tests/runeforge_presentation_state_static_test.py",
+      "bytes": 4764,
+      "sha256": "34f032ff1ed69a332d0e5981c3995cf52552fd06522ef5cb15aecb7290efe77f"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/tests/runeforge_reader_input_static_test.py",
+      "bytes": 8816,
+      "sha256": "47b6286371989e473e913c1c61680877785e21b1bfd59f6119be9af3b4424fb0"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/tests/runeforge_snapshot_contract_static_test.py",
+      "bytes": 9403,
+      "sha256": "6c202e1cbc088fa18cd731d560fde6051b6e23b224048d10122c8df6e76a0f8c"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/tests/runeforge_workstation_native_mutants.py",
+      "bytes": 24108,
+      "sha256": "4c44062058d00e078b80ccb23cbcc025666b435241b1bfab3d6430b970b32987"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/tests/runeforge_workstation_policy_tests.cpp",
+      "bytes": 123948,
+      "sha256": "65245cd5776e150bc23d2132a7a8bacf3152104a9f1101171357d1872fe3a30a"
+    },
+    {
+      "status": "A",
+      "path": "skse/CalamityAffixes/tests/runeword_effect_card_checks.inl",
+      "bytes": 25530,
+      "sha256": "d549ef6dcbbaec7c615e3711df209cf3f656f36fc63fba4cdb77efb5f0e7a0f5"
+    }
+  ]
+}
