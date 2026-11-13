@@ -16,6 +16,8 @@
 #include "CalamityAffixes/PluginEditorIds.h"
 #include "CalamityAffixes/PluginLogging.h"
 #include "CalamityAffixes/PrismaTooltip.h"
+#include "CalamityAffixes/RuneforgeMenu.h"
+#include "CalamityAffixes/RuneforgeWorkstation.h"
 #include "CalamityAffixes/EchoStrikeSystem.h"
 #include "CalamityAffixes/TrapSystem.h"
 #include "CalamityAffixes/Version.h"
@@ -120,6 +122,8 @@ SKSEPluginInfo(
 				SKSE::log::info("CalamityAffixes: runtime starts disabled; installed systems remain dormant until enabled.");
 			}
 			CalamityAffixes::PrismaTooltip::Install();
+			CalamityAffixes::RuneforgeMenu::Install();
+			CalamityAffixes::RuneforgeWorkstation::Install();
 
 			if (auto* console = RE::ConsoleLog::GetSingleton()) {
 				console->Print("CalamityAffixes: EventBridge registered.");
@@ -129,8 +133,12 @@ SKSEPluginInfo(
 		case SKSE::MessagingInterface::kPostLoadGame:
 			CalamityAffixes::EventBridge::GetSingleton()->OnPostLoadGame();
 			CalamityAffixes::RestoreCalamitySummonsAfterLoad();
+			// Runeforge workstation T6: IDLE, WS_Reset(0), native sweep of the forge cell.
+			CalamityAffixes::RuneforgeWorkstation::OnPostLoadGame();
 			break;
 		case SKSE::MessagingInterface::kPreLoadGame:
+			// Runeforge workstation T6: abort the session, close its menu, restore the camera at once.
+			CalamityAffixes::RuneforgeWorkstation::OnPreLoadGame();
 			CalamityAffixes::EventBridge::GetSingleton()->OnPreLoadGame();
 			break;
 		case SKSE::MessagingInterface::kSaveGame:

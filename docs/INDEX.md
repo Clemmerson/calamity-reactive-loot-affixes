@@ -1,91 +1,39 @@
-# docs/ 디렉토리 인덱스
+# Documentation
 
-- [VFX/SFX Matrix / 시각·음향 피드백 매트릭스](VFX_MATRIX.md)
+This fork is pinned to **Calamity 2.2.8** at upstream commit `989f215e81f3595dc4526a1311437946646a998a`. It does not include later Calamity 2.3.x changes. The documents here describe source behavior and historical test procedures; they do not certify the FEASR RC1 gameplay release.
 
-## 어픽스 효과 목록
+## Start here
 
-| 파일 | 설명 | 생성 |
-|------|------|------|
-| `PREFIX_EFFECTS.md` | 공개용 프리픽스 73개 효과 정리, 인게임 표시 문자열 기준 | `tools/gen_prefix_doc.py` |
-| `SUFFIX_EFFECTS.md` | 공개용 서픽스 22패밀리 66개 효과 정리, 인게임 표시 문자열 기준 | `tools/gen_suffix_doc.py` |
-| `RUNEWORD_EFFECTS.md` | 공개용 룬워드 94개 효과 정리, 인게임 표시 문자열 기준 | `tools/gen_runeword_doc.py` |
-| `AFFIX_CATALOG.md` | 공개용 어픽스 전체 입구 문서 | `tools/update_docs.py` |
+- [FEASR fork overview](../README.md)
+- [Build instructions and clean-build comparison](../BUILDING.md)
+- [Compatibility and dependencies](../COMPATIBILITY.md)
+- [Upstream attribution and permission scope](../UPSTREAM.md)
+- [FEASR-specific support policy](../SUPPORT.md)
+- [FEASR source change log](../CHANGELOG-FEASR.md)
+- [Source and build checksum manifest](../SOURCE-MANIFEST.json)
+- [Language and preservation policy](LANGUAGE-AND-TRANSLATION.md)
 
-## 루트 문서
+## Affixes and runewords
 
-| 파일 | 설명 |
-|------|------|
-| `NEXUS_DESCRIPTION.md` | Nexus Mods 배포 페이지 설명 (한국어/영어) |
-| `NEXUS_DESCRIPTION_BBCODE.txt` | Nexus Mods BBCode 포맷 설명 |
-| `스카이림 바닐라 효과 ARPG 변환 아이디어.md` | 바닐라 효과 → ARPG 어픽스 변환 기획 노트 |
+- [English affix catalog](AFFIX_CATALOG.en.md): counts, categories, and the translated overview of the upstream catalog.
+- [Prefix effects](PREFIX_EFFECTS.md): generated public descriptions and values.
+- [Suffix effects](SUFFIX_EFFECTS.md): generated family tiers and values.
+- [Runeword effects](RUNEWORD_EFFECTS.md): generated rune combinations and descriptions.
+- [VFX/SFX matrix](VFX_MATRIX.md): bilingual notes on visual and sound behavior.
+- Korean originals remain available as [the generated Korean catalog](AFFIX_CATALOG.md) and [the original Korean index](INDEX.ko.md).
 
-## design/ — 설계 문서
+The pinned source data defines 73 public prefixes, 66 suffixes across 22 families, 95 runewords, and 33 rune weights. These are source/catalog counts, not a claim that every gameplay path passed RC1 certification.
 
-프로젝트 기획, 아키텍처, 워크플로우 문서. (구 `doc/`에서 이동)
+## Testing references
 
-| 파일 | 설명 |
-|------|------|
-| `개발명세서.md` | 프로젝트 개발 명세서 |
-| `CK_MVP_셋업_체크리스트.md` | Creation Kit MVP 셋업 체크리스트 |
-| `데이터주도_생성기_워크플로우.md` | 데이터 주도 생성기 워크플로우 |
-| `아키텍처_분석_리팩터링_로드맵.md` | 아키텍처 분석 및 리팩터링 로드맵 |
+- [In-game smoke checklist — English translation](QA_SMOKE_CHECKLIST.en.md), paired with [the Korean source](QA_SMOKE_CHECKLIST.md).
+- [Stability scenarios — English translation](QA_STABILITY_SCENARIOS.en.md), paired with [the Korean source](QA_STABILITY_SCENARIOS.md).
+- [Corpse currency compatibility policy](references/2026-07-14-corpse-runtime-currency-policy.md): includes an English summary followed by the original Korean detail.
 
-## adr/ — Architecture Decision Records
+These are procedures and recorded observations from earlier project work. Read their status notes before treating an item as verified. This fork preparation did not run them or certify RC1 gameplay.
 
-프로젝트 핵심 아키텍처 결정 기록.
+## Korean planning archive
 
-| 파일 | 설명 |
-|------|------|
-| `0001-instance-affix-storage-extrauniqueid-serialization.md` | 인스턴스 어픽스 저장 방식 (ExtraUniqueID + 직렬화) |
-| `0002-prisma-ui-tooltip-overlay.md` | Prisma UI 기반 툴팁 오버레이 결정 |
-| `0003-trigger-pipeline-healthdamage-hook-hit-event-dot-apply.md` | 전투 트리거 파이프라인 (HealthDamage 훅 + HitEvent + DoT) |
+The upstream Korean design, planning, architecture, review, and release notes remain in their original paths and in inherited upstream history. Examples include `design/`, `plans/`, `reviews/`, `releases/`, the root `CHANGELOG.md`, and `스카이림 바닐라 효과 ARPG 변환 아이디어.md`. They are preserved as historical source material; they are not current build instructions or blanket compatibility guarantees.
 
-## plans/ — 기획 및 설계 문서
-
-기능 기획, 코드 리뷰, 리팩터링 계획 등.
-
-주요 문서:
-- `2026-02-12-prefix-suffix-system-v1.md` — Prefix/Suffix 분류 시스템
-- `2026-02-07-runeword-physical-fragments.md` — 룬워드 물리 조각 시스템
-- `2026-02-13-bilingual-i18n.md` — 한영 이중 언어 지원
-- `2026-02-02-eventbridge-split-v1.md` — EventBridge 도메인 분할
-- `2026-02-09-eventbridge-actions-decomposition-v1.md` — EventBridge 액션 분해
-- `2026-01-31-autogen-spell-mgef.md` — ESP 자동 생성 (MagicEffect/Spell)
-- `2026-03-06-eventbridge-state-ownership-extraction-design.md` — EventBridge 상태 소유권 분리 상위 설계
-- `2026-03-06-combat-runtime-state-extraction-design.md` — 전투 runtime state ownership 분리 설계
-- `2026-03-06-loot-runtime-state-extraction-design.md` — loot runtime state ownership 분리 설계
-- `2026-03-06-runeword-runtime-state-extraction-design.md` — runeword runtime state ownership 분리 설계
-- `2026-03-06-serialization-runtime-state-extraction-design.md` — serialization runtime state ownership 분리 설계
-- `2026-07-27-eventbridge-decomposition-status-and-next-steps.md` — 위 상위 설계의 실측 달성도 감사와 수정된 단계 순서
-
-## references/ — 참조 문서
-
-외부 아키텍처 분석, 호환성 정책, LoreBox 예제.
-
-| 파일 | 설명 |
-|------|------|
-| `2026-02-09-event-signatures.md` | SKSE 이벤트 시그니처 참조 |
-| `2026-02-15-calamityaffixes-architecture-snapshot-v1.2.14.md` | v1.2.14 아키텍처 스냅샷 |
-| `2026-02-22-corpse-drop-compat-policy.md` | 시체 드랍 호환성 정책 |
-| `LoreBox-Example/` | LoreBox ESP 예제 (Nexus #156534) |
-| `LoreBox-Tutorial/` | LoreBox 튜토리얼 (Nexus #156534) |
-
-## releases/ — 릴리즈 기록
-
-GitHub 릴리즈 본문, Nexus 배포 카피, QA 체크리스트 등.
-
-주요 유형:
-- `github-release-body-*.md` — GitHub 릴리즈 노트
-- `ingame-qa-smoke-checklist.md` — 인게임 QA 스모크 테스트
-- `nexus-*` — Nexus Mods 배포 관련
-
-## reviews/ — 코드 리뷰 및 분석
-
-| 파일 | 설명 |
-|------|------|
-| `2026-02-18-deep-review.md` | 심층 코드 리뷰 |
-| `2026-02-21-runeword-94-diff-rc2-to-rc6.md` | 룬워드 94종 RC2→RC6 변경 diff |
-| `2026-02-26-deep-analysis-comprehensive.md` | 종합 심층 분석 |
-| `2026-02-26-deep-analysis-round2-supplement.md` | 심층 분석 2차 보충 |
-| `2026-02-26-deep-analysis-round3-final-decision.md` | 심층 분석 3차 최종 결정 |
-| `2026-03-06-architecture-hotspots-overview.md` | 현재판 아키텍처 요약 + hotspot 5개 + 우선 개선 순서 |
+The original Calamity README is also preserved at the repository root as [README.ko.md](../README.ko.md). For the source history and permission boundary, see [UPSTREAM.md](../UPSTREAM.md).

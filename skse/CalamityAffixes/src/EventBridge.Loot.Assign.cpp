@@ -132,6 +132,7 @@ namespace CalamityAffixes
 		std::string_view a_reason)
 	{
 		const auto erasedAffixCount = _instanceTrackingState.instanceAffixes.erase(a_key);
+		_instanceTrackingState.instanceBaseObjects.erase(a_key);
 		_instanceTrackingState.selectedReforgeCounts.erase(a_key);
 		EraseInstanceRuntimeStates(a_key);
 		ForgetLootEvaluatedInstance(a_key);
@@ -258,6 +259,7 @@ namespace CalamityAffixes
 
 		if (slots.count == 0) {
 			ForgetLootEvaluatedInstance(a_it->first);
+			_instanceTrackingState.instanceBaseObjects.erase(a_it->first);
 			_instanceTrackingState.selectedReforgeCounts.erase(a_it->first);
 			a_it = _instanceTrackingState.instanceAffixes.erase(a_it);
 			++a_erasedInstances;

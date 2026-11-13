@@ -1,6 +1,7 @@
 #include "CalamityAffixes/EventBridge.h"
 
 #include "CalamityAffixes/PlayerOwnership.h"
+#include "CalamityAffixes/PrismaTooltip.h"
 #include <string_view>
 
 namespace CalamityAffixes
@@ -23,16 +24,33 @@ namespace CalamityAffixes
 		}
 
 		const std::string_view eventName(eventNameRaw);
+		if (eventName.starts_with("FEASR_Runeforge_Reader_")) {
+			const char* stringArgRaw = a_event->strArg.c_str();
+			PrismaTooltip::HandleRuneforgeReaderEvent(
+				eventName,
+				stringArgRaw ? std::string_view(stringArgRaw) : std::string_view{},
+				a_event->numArg);
+			return RE::BSEventNotifyControl::kContinue;
+		}
+		if (eventName.starts_with("FEASR_Runeforge_")) {
+			SKSE::log::info("RuneforgeDiag: EventBridge received event='{}' configLoaded={}", eventName, _configLoaded);
+		}
 		if (HandleUiModCallback(eventName, a_event->numArg)) {
 			return RE::BSEventNotifyControl::kContinue;
 		}
 
 		if (!_configLoaded) {
+			if (eventName.starts_with("FEASR_Runeforge_")) {
+				SKSE::log::warn("RuneforgeDiag: event='{}' rejected reason=runtime_config_not_loaded; consumer_not_called", eventName);
+			}
 			return RE::BSEventNotifyControl::kContinue;
 		}
 
 		const char* filterRaw = a_event->strArg.c_str();
 		const std::string_view affixFilter = (filterRaw && *filterRaw) ? std::string_view(filterRaw) : std::string_view{};
+		if (HandleFeasrRuneforgeModCallback(eventName, affixFilter, a_event->numArg)) {
+			return RE::BSEventNotifyControl::kContinue;
+		}
 		if (HandleRuntimeSettingsModCallback(eventName, a_event->numArg, now)) {
 			return RE::BSEventNotifyControl::kContinue;
 		}
@@ -74,6 +92,24 @@ namespace CalamityAffixes
 			a_sender
 		};
 
+		source->SendEvent(&event);
+	}
+
+	void EventBridge::SendModEvent(std::string_view a_eventName, std::string_view a_strArg, float a_numArg, RE::TESForm* a_sender)
+	{
+		auto* source = SKSE::GetModCallbackEventSource();
+		if (!source || a_eventName.empty()) {
+			return;
+		}
+
+		const std::string eventName(a_eventName);
+		const std::string strArg(a_strArg);
+		SKSE::ModCallbackEvent event{
+			RE::BSFixedString(eventName.c_str()),
+			RE::BSFixedString(strArg.c_str()),
+			a_numArg,
+			a_sender
+		};
 		source->SendEvent(&event);
 	}
 

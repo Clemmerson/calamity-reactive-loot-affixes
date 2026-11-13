@@ -16,6 +16,9 @@
 			const std::vector<RunewordBaseInventoryEntry>& a_entries)
 		{
 			nlohmann::json payload = nlohmann::json::array();
+			// RC1 legacy-UI policy: with FEASR Runeforge active, Runeforge rows are locked to the FE-ASR (English)
+			// names in every language mode; Calamity's Korean legacy runeword names never show on them.
+			const bool lockFeasrNames = RuneforgeWorkstation::IsFeasrRuneforgeActive();
 			for (const auto& entry : a_entries) {
 				payload.push_back({
 					{ "key", std::to_string(entry.instanceKey) },
@@ -25,6 +28,9 @@
 					{ "runewordNameKo", entry.runewordNameKo },
 					{ "selected", entry.selected }
 				});
+				if (lockFeasrNames && !entry.runewordNameEn.empty()) {
+					payload.back()["runewordNameKo"] = entry.runewordNameEn;
+				}
 			}
 
 			return payload;
@@ -42,7 +48,10 @@
 			const std::vector<RunewordRecipeEntry>& a_entries)
 		{
 			nlohmann::json payload = nlohmann::json::array();
+			const bool feasrActive = RuneforgeWorkstation::IsFeasrRuneforgeActive();
 			for (const auto& entry : a_entries) {
+				// RC1 legacy-UI policy: FE-ASR rows are locked to their English FE-ASR text in every language mode.
+				const bool lock = feasrActive && RuneforgePresentation::IsKnownRecipe(entry.recipeId);
 				payload.push_back({
 					{ "token", std::to_string(entry.recipeToken) },
 					{ "name", entry.displayName },
@@ -51,6 +60,8 @@
 					{ "runes", entry.runeSequence },
 					{ "runeTokens", BuildRunewordRuneTokenArrayJson(entry.runeTokens) },
 					{ "summaryKey", entry.effectSummaryKey },
+					// English fields above already carry FE-ASR presentation for this row.
+					{ "feasrPresentation", RuneforgePresentation::IsKnownRecipe(entry.recipeId) },
 					{ "summaryEn", entry.effectSummaryTextEn },
 					{ "summaryKo", entry.effectSummaryTextKo },
 					{ "detailEn", entry.effectDetailTextEn },
@@ -60,6 +71,15 @@
 					{ "baseKey", entry.recommendedBaseKey },
 					{ "selected", entry.selected }
 				});
+				if (lock) {
+					auto& row = payload.back();
+					row["name"] = entry.displayNameEn;
+					row["nameKo"] = entry.displayNameEn;
+					row["summaryKo"] = entry.effectSummaryTextEn;
+					row["detailKo"] = entry.effectDetailTextEn;
+					row["summary"] = entry.effectSummaryTextEn;
+					row["detail"] = entry.effectDetailTextEn;
+				}
 			}
 
 			return payload;
@@ -90,6 +110,7 @@
 					{ "token", entry.token == 0u ? std::string{} : std::to_string(entry.token) },
 					{ "displayNameEn", entry.displayNameEn },
 					{ "displayNameKo", entry.displayNameKo },
+					{ "effectSummaryEn", entry.effectSummaryEn },
 					{ "group", entry.group },
 					{ "triggerKey", entry.triggerKey },
 					{ "slotKind", entry.slotKind },
@@ -112,6 +133,10 @@
 					{ "normalWeaponHitProcStackCount", entry.normalWeaponHitProcStackCount },
 					{ "hasLuckyHitGate", entry.hasLuckyHitGate },
 					{ "luckyHitGateChancePct", entry.luckyHitGateChancePct },
+					{ "cooldownSeconds", entry.cooldownSeconds },
+					{ "perTargetCooldownSeconds", entry.perTargetCooldownSeconds },
+					{ "lowHealthThresholdPct", entry.lowHealthThresholdPct },
+					{ "lowHealthRearmPct", entry.lowHealthRearmPct },
 				});
 			}
 
@@ -125,6 +150,8 @@
 
 		[[nodiscard]] nlohmann::json BuildRunewordPanelStatePayload(const RunewordPanelState& a_state)
 		{
+			// RC1 legacy-UI policy: the selected Runeforge recipe shows its FE-ASR (English) name in every language mode.
+			const bool lockFeasrRecipeName = a_state.hasRecipe && !a_state.recipeNameEn.empty() && RuneforgeWorkstation::IsFeasrRuneforgeActive();
 			nlohmann::json requiredRunes = nlohmann::json::array();
 			for (const auto& req : a_state.requiredRunes) {
 				requiredRunes.push_back({
@@ -192,6 +219,12 @@
 				{ "debugTools", a_state.debugTools }
 			};
 
+			if (lockFeasrRecipeName) {
+				auto locked = payload;
+				locked["recipeName"] = a_state.recipeNameEn;
+				locked["recipeNameKo"] = a_state.recipeNameEn;
+				return locked;
+			}
 			return payload;
 		}
 

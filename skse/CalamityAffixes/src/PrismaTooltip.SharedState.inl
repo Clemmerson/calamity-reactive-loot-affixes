@@ -9,7 +9,11 @@
 		constexpr auto kViewOrder = 5000;
 		constexpr auto kMouseButtonOffset = 256u;
 		constexpr std::uint32_t kFallbackPanelHotkey = RE::BSKeyboardDevice::Keys::kF11;
-		constexpr int kDefaultUiLanguageMode = 2;  // 0=en, 1=ko, 2=both
+		// The catalog bypass is available only in Debug builds for development.
+#if !defined(NDEBUG)
+		constexpr std::uint32_t kRuneforgeDebugHotkey = RE::BSKeyboardDevice::Keys::kF10;
+#endif
+		constexpr int kDefaultUiLanguageMode = 0;  // 0=en, 1=ko, 2=both
 		constexpr auto kPrismaCommandListener = "calamityCommand";
 		constexpr auto kInteropSetTooltip = "setTooltip";
 		constexpr auto kInteropSetControlPanel = "setControlPanel";
@@ -24,6 +28,9 @@
 		constexpr auto kInteropSetRunewordAffixPreview = "setRunewordAffixPreview";
 		constexpr auto kInteropSetPanelLayout = "setPanelLayout";
 		constexpr auto kInteropSetTooltipLayout = "setTooltipLayout";
+		constexpr auto kInteropSetRuneforgeReader = "setRuneforgeReader";
+		constexpr auto kInteropSetRuneforgeReaderPage = "setRuneforgeReaderPage";
+		constexpr auto kInteropSetRuneforgeReaderVisible = "setRuneforgeReaderVisible";
 
 		constexpr std::string_view kMenuInventory = RE::InventoryMenu::MENU_NAME;
 		constexpr std::string_view kMenuBarter = RE::BarterMenu::MENU_NAME;
@@ -78,6 +85,39 @@
 		std::atomic_int g_relevantMenusOpen{ 0 };
 		std::atomic_bool g_gatePollingOnMenus{ false };
 		std::atomic_bool g_controlPanelOpen{ false };
+		std::atomic_bool g_runeforgeReaderOpen{ false };
+		struct RuneforgeReaderDocument
+		{
+			std::string title;
+			std::string substrate;
+			std::vector<std::string> pages;
+		};
+		struct RuneforgeReaderDraft
+		{
+			RuneforgeReaderDocument document;
+			std::size_t expectedPages{};
+			bool active{};
+		};
+		RuneforgeReaderDocument g_runeforgeReaderDocument{};
+		RuneforgeReaderDraft g_runeforgeReaderDraft{};
+		std::mutex g_runeforgeReaderDraftMutex;
+		std::size_t g_runeforgeReaderPage{};
+		bool g_runeforgeReaderNeedsPush{};
+		// R8.7.4.14 reader input/exit contract (RuneforgeReaderInputContract.h). The reader state above is touched from the
+		// task thread (open, tick), the input-device sink (keyboard/gamepad, mailbox drain) and the menu sink, so every
+		// transition holds this mutex. JS commands never take it: they only post to the mailbox.
+		std::recursive_mutex g_runeforgeReaderMutex;
+		bool g_runeforgeReaderFocusConfirmed{};
+		unsigned g_runeforgeReaderFocusRequests{};
+		bool g_runeforgeReaderAckSeen{};
+		bool g_runeforgeReaderAckWarned{};
+		std::chrono::steady_clock::time_point g_runeforgeReaderPushedAt{};
+		std::chrono::steady_clock::time_point g_runeforgeReaderNextServiceAt{};
+		std::mutex g_runeforgeReaderMailboxMutex;
+		std::vector<RuneforgeReaderContract::Action> g_runeforgeReaderMailbox;
+		std::atomic_bool g_runeforgeReaderAckPending{ false };
+		std::atomic_uint32_t g_runeforgeReaderPointerReports{ 0u };
+		std::uint8_t g_runeforgeReaderCloseKeysArmed{};
 		std::atomic_uint32_t g_controlPanelHotkey{ 0u };
 		std::atomic_int g_uiLanguageMode{ kDefaultUiLanguageMode };
 

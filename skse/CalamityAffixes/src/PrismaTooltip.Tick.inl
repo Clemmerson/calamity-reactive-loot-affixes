@@ -66,6 +66,9 @@
 			if (IsGameplayReady()) {
 				return false;
 			}
+			if (g_runeforgeReaderOpen.load(std::memory_order_acquire)) {
+				CloseRuneforgeReaderOnGameThread(RuneforgeReaderContract::Source::kGameplayUnavailable);
+			}
 
 			g_lastPanelStateKnown = false;
 			ClearTooltipViewState(true);
@@ -181,6 +184,10 @@
 			PushTickUiSettingsAndLayouts();
 
 			if (HandleTickWhileGameplayUnavailable(now)) {
+				return;
+			}
+			if (g_runeforgeReaderOpen.load(std::memory_order_acquire)) {
+				TickRuneforgeReader();
 				return;
 			}
 

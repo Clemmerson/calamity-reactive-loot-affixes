@@ -72,7 +72,9 @@ namespace CalamityAffixes
 		a_out.displayNameEn = a_affix.value("nameEn", std::string{});
 		a_out.displayNameKo = a_affix.value("nameKo", std::string{});
 		if (a_out.displayNameEn.empty()) {
-			a_out.displayNameEn = a_out.displayName;
+			// Legacy `name` is Korean in existing configs. Use the stable ASCII ID
+			// when an explicit English name is unavailable.
+			a_out.displayNameEn = a_out.id;
 		}
 		if (a_out.displayNameKo.empty()) {
 			a_out.displayNameKo = a_out.displayName;

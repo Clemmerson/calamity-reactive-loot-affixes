@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "CalamityAffixes/InstanceAffixSlots.h"
+#include "CalamityAffixes/DropPickupOwnershipPolicy.h"
 
 namespace CalamityAffixes::SerializationWire
 {
@@ -40,8 +41,9 @@ namespace CalamityAffixes::SerializationWire
 	// Appended last so every earlier record keeps its position; older DLLs drain
 	// it as an unknown record.
 	inline constexpr RecordContract kInstanceReforgeCounts{ MakeRecordType('I', 'R', 'F', 'C'), 1u };
+	inline constexpr RecordContract kPendingDropOwnership{ MakeRecordType('P', 'D', 'O', 'P'), 3u };
 
-	inline constexpr std::array<RecordContract, 9> kCurrentRecordSequence{
+	inline constexpr std::array<RecordContract, 10> kCurrentRecordSequence{
 		kInstanceAffixes,
 		kInstanceRuntimeStates,
 		kRunewordState,
@@ -51,6 +53,7 @@ namespace CalamityAffixes::SerializationWire
 		kLootShuffleBags,
 		kMigrationFlags,
 		kInstanceReforgeCounts,
+		kPendingDropOwnership,
 	};
 
 	struct InstanceAffixEntry
@@ -127,6 +130,18 @@ namespace CalamityAffixes::SerializationWire
 		[[nodiscard]] bool operator==(const InstanceReforgeCountEntry&) const noexcept = default;
 	};
 
+	struct PendingDropOwnershipEntry
+	{
+		std::uint32_t ownerFormId{ 0u };
+		std::uint16_t uniqueId{ 0u };
+		std::uint32_t baseFormId{ 0u };
+		std::uint32_t expiresAtDay{ 0u };
+		std::uint32_t referenceFormId{ 0u };
+		std::uint8_t referenceIdentityEstablished{ 0u };
+
+		[[nodiscard]] bool operator==(const PendingDropOwnershipEntry&) const noexcept = default;
+	};
+
 	struct LootShuffleBagEntry
 	{
 		std::uint8_t id{ 0u };
@@ -162,6 +177,9 @@ namespace CalamityAffixes::SerializationWire
 		std::uint8_t migrationFlags{ 0u };
 
 		std::vector<InstanceReforgeCountEntry> instanceReforgeCounts{};
+		std::vector<PendingDropOwnershipEntry> pendingDropOwnership{};
+		bool pendingDropOwnershipOverflow{ false };
+		std::uint32_t pendingDropOwnershipOverflowExpiresAtDay{ 0u };
 
 		[[nodiscard]] bool operator==(const CurrentSaveSnapshot&) const noexcept = default;
 	};
@@ -331,6 +349,27 @@ namespace CalamityAffixes::SerializationWire
 		return true;
 	}
 
+	template <class Write>
+	[[nodiscard]] bool WritePendingDropOwnershipPayload(Write& a_write, const CurrentSaveSnapshot& a_snapshot)
+	{
+		if (!WriteScalar(a_write, static_cast<std::uint8_t>(a_snapshot.pendingDropOwnershipOverflow ? 1u : 0u)) ||
+			!WriteScalar(a_write, a_snapshot.pendingDropOwnershipOverflowExpiresAtDay) ||
+			!WriteScalar(a_write, static_cast<std::uint32_t>(a_snapshot.pendingDropOwnership.size()))) {
+			return false;
+		}
+		for (const auto& entry : a_snapshot.pendingDropOwnership) {
+			if (!WriteScalar(a_write, entry.ownerFormId) ||
+				!WriteScalar(a_write, entry.uniqueId) ||
+				!WriteScalar(a_write, entry.baseFormId) ||
+				!WriteScalar(a_write, entry.expiresAtDay) ||
+				!WriteScalar(a_write, entry.referenceFormId) ||
+				!WriteScalar(a_write, entry.referenceIdentityEstablished)) {
+				return false;
+			}
+		}
+		return true;
+	}
+
 	template <class OpenRecord, class Write>
 	[[nodiscard]] bool WriteCurrentRecords(
 		const CurrentSaveSnapshot& a_snapshot,
@@ -350,7 +389,8 @@ namespace CalamityAffixes::SerializationWire
 		       writeRecord(kCorpseCurrencyRuntime, WriteCorpseCurrencyRuntimePayload<Write>) &&
 		       writeRecord(kLootShuffleBags, WriteLootShuffleBagsPayload<Write>) &&
 		       writeRecord(kMigrationFlags, WriteMigrationFlagsPayload<Write>) &&
-		       writeRecord(kInstanceReforgeCounts, WriteInstanceReforgeCountsPayload<Write>);
+		       writeRecord(kInstanceReforgeCounts, WriteInstanceReforgeCountsPayload<Write>) &&
+		       writeRecord(kPendingDropOwnership, WritePendingDropOwnershipPayload<Write>);
 	}
 
 }

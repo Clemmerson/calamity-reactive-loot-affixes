@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 
@@ -21,6 +22,25 @@ namespace CalamityAffixes
 		{
 			_refs.fill({});
 			_cursor = 0;
+		}
+
+		// A zero-reference pickup can still resolve from the exact ExtraUniqueID
+		// copied into the returning singleton inventory list. Retire every stale
+		// handle for that exact key so repeat drops cannot inherit an old handle.
+		[[nodiscard]] constexpr std::size_t ForgetPlayerDropReferencesByInstanceKey(
+			InstanceKey a_instanceKey) noexcept
+		{
+			if (a_instanceKey == 0u) {
+				return 0u;
+			}
+			std::size_t removed = 0u;
+			for (auto& entry : _refs) {
+				if (entry.ref != 0u && entry.instanceKey == a_instanceKey) {
+					entry = {};
+					++removed;
+				}
+			}
+			return removed;
 		}
 
 		constexpr void NotePlayerDrop(

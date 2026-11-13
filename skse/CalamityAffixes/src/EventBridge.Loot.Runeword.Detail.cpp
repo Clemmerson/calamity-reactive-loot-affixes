@@ -1,5 +1,6 @@
 #include "CalamityAffixes/EventBridge.h"
 #include "CalamityAffixes/PluginEditorIds.h"
+#include "CalamityAffixes/RunewordRuneWeights.h"
 #include "EventBridge.Loot.Runeword.Detail.h"
 
 #include <algorithm>
@@ -40,14 +41,42 @@ namespace CalamityAffixes::RunewordDetail
 						return "<Unknown>";
 					}
 
+					auto usableName = [](std::string_view a_name) {
+						if (a_name.empty()) {
+							return false;
+						}
+						const auto folded = ToLowerAscii(a_name);
+						return folded != "<missing name>" && folded != "<unknown>" && folded != "unknown" && folded != "unnamed";
+					};
+
 					const char* displayRaw = a_xList ? a_xList->GetDisplayName(a_entry->object) : nullptr;
-					std::string displayName = displayRaw ? displayRaw : "";
-					if (displayName.empty()) {
-						const char* objectNameRaw = a_entry->object->GetName();
-						displayName = objectNameRaw ? objectNameRaw : "";
+					const std::string rawDisplayName = displayRaw ? displayRaw : "";
+					const char* objectNameRaw = a_entry->object->GetName();
+					const std::string objectName = objectNameRaw ? objectNameRaw : "";
+					const std::string editorId{ PluginEditorIds::OwnEditorIdOf(a_entry->object) };
+
+					std::string displayName = rawDisplayName;
+					if (!usableName(displayName)) {
+						displayName = objectName;
 					}
-					if (displayName.empty()) {
-						displayName = "<Unknown>";
+					if (!usableName(displayName)) {
+						const auto* object = a_entry->object;
+						const std::string_view kind = object->As<RE::TESObjectWEAP>() ? "weapon" : "armor";
+						if (usableName(editorId)) {
+							displayName = "Unnamed " + std::string(kind) + " [EditorID: " + editorId + "]";
+						} else {
+							displayName = "Unnamed " + std::string(kind) + " [Form " +
+								std::to_string(object->GetFormID()) + "]";
+						}
+					}
+
+					const auto foldedName = ToLowerAscii(displayName);
+					if (foldedName.find("unknown") != std::string::npos ||
+						foldedName.find("missing name") != std::string::npos ||
+						foldedName.find("unnamed") != std::string::npos) {
+						SKSE::log::info(
+							"RuneforgeDiag: suspicious item label formID={} rawDisplay='{}' objectName='{}' editorID='{}' resolved='{}'",
+							a_entry->object->GetFormID(), rawDisplayName, objectName, editorId, displayName);
 					}
 
 					return displayName;
@@ -61,43 +90,7 @@ namespace CalamityAffixes::RunewordDetail
 						return 1.0;
 					}
 
-					constexpr std::array<std::pair<std::string_view, double>, 33> kRuneWeights{ {
-						{ "El", 4.0 },
-						{ "Eld", 4.0 },
-						{ "Tir", 4.0 },
-						{ "Nef", 4.0 },
-						{ "Eth", 4.0 },
-						{ "Ith", 4.0 },
-						{ "Tal", 4.0 },
-						{ "Ral", 4.0 },
-						{ "Ort", 4.0 },
-						{ "Thul", 4.0 },
-						{ "Amn", 4.0 },
-						{ "Sol", 3.0 },
-						{ "Shael", 3.0 },
-						{ "Dol", 3.0 },
-						{ "Hel", 3.0 },
-						{ "Io", 3.0 },
-						{ "Lum", 3.0 },
-						{ "Ko", 3.0 },
-						{ "Fal", 3.0 },
-						{ "Lem", 3.0 },
-						{ "Pul", 3.0 },
-						{ "Um", 3.0 },
-						{ "Mal", 2.0 },
-						{ "Ist", 2.0 },
-						{ "Gul", 2.0 },
-						{ "Vex", 2.0 },
-						{ "Ohm", 2.0 },
-						{ "Lo", 2.0 },
-						{ "Sur", 1.0 },
-						{ "Ber", 1.0 },
-						{ "Jah", 1.0 },
-						{ "Cham", 1.0 },
-						{ "Zod", 1.0 },
-					} };
-
-					for (const auto& [name, weight] : kRuneWeights) {
+					for (const auto& [name, weight] : kPinnedRunewordRuneWeights) {
 						if (a_runeName == name) {
 							return weight;
 						}

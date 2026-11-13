@@ -23,6 +23,7 @@
 #include <SKSE/SKSE.h>
 
 #include "CalamityAffixes/ItemSubtypePolicy.h"
+#include "CalamityAffixes/DropPickupInventoryIdentityPolicy.h"
 #include "CalamityAffixes/AffixCraftingPolicy.h"
 #include "CalamityAffixes/TrapCellPolicy.h"
 #include "CalamityAffixes/DeferredEventDispatcher.h"
@@ -40,6 +41,7 @@
 	#include "CalamityAffixes/MagnitudeScaling.h"
 	#include "CalamityAffixes/RuntimeUserSettingsDebounce.h"
 #include "CalamityAffixes/EventNames.h"
+#include "CalamityAffixes/RuneforgePresentation.h"
 #include "CalamityAffixes/RunewordUiContracts.h"
 #include "CalamityAffixes/RuntimePolicy.h"
 #include "CalamityAffixes/ResyncScheduler.h"
@@ -64,6 +66,8 @@ namespace CalamityAffixes
 	public:
 		using OperationResult = ::CalamityAffixes::OperationResult;
 		using RunewordBaseInventoryEntry = ::CalamityAffixes::RunewordBaseInventoryEntry;
+		using RuneforgeInventoryEntry = ::CalamityAffixes::RuneforgeInventoryEntry;
+		using RuneforgeInventorySnapshot = ::CalamityAffixes::RuneforgeInventorySnapshot;
 		using RunewordPanelState = ::CalamityAffixes::RunewordPanelState;
 		using RunewordRecipeEntry = ::CalamityAffixes::RunewordRecipeEntry;
 		using RunewordRuneRequirement = ::CalamityAffixes::RunewordRuneRequirement;
@@ -122,6 +126,7 @@ namespace CalamityAffixes
 		static bool IsPlayerOwned(RE::Actor* a_actor);
 		static RE::Actor* GetPlayerOwner(RE::Actor* a_actor);
 		static void SendModEvent(std::string_view a_eventName, RE::TESForm* a_sender);
+		static void SendModEvent(std::string_view a_eventName, std::string_view a_strArg, float a_numArg, RE::TESForm* a_sender);
 
 		// Config/event string constants, policy constants, serialization constants.
 		#define CALAMITYAFFIXES_EVENTBRIDGE_CONSTANTS_INL_CONTEXT 1
@@ -143,11 +148,22 @@ namespace CalamityAffixes
 		LootRuntimeState _lootState{};
 		InstanceTrackingState _instanceTrackingState{};
 		RunewordRuntimeState _runewordState{};
+		std::uint64_t _runeforgeInventorySnapshotRevision{ 0u };
 		TrapRuntimeState _trapState{};
 		LootConfig _loot{};
 		RuntimeSettingsState _runtimeSettings{};
 		bool _miscCurrencyMigrated{ false };
 		bool _miscCurrencyRecovered{ false };
+		// Non-persistent enforcement cache. FE ASR's quest owns saved discovery
+		// and repopulates this mirror after load through the versioned event API.
+		std::unordered_set<std::string> _feasrKnownRunewordRecipeIds{};
+		std::string _feasrDiscoveryRevision{};
+		std::uint32_t _feasrDiscoveryExpectedCount{ 0u };
+		std::uint32_t _feasrDiscoveryReceivedCount{ 0u };
+		bool _feasrDiscoverySyncActive{ false };
+		bool _feasrDiscoveryReady{ false };
+		bool _feasrDiscoverySyncValid{ false };
+		bool _feasrRuneforgeContractCompatible{ false };
 		bool _configLoaded{ false };
 		std::atomic_bool _eventSinksRegistered{ false };
 		static std::mt19937::result_type MakeRngSeed() noexcept
@@ -175,6 +191,7 @@ namespace CalamityAffixes
 		struct EngineEventContext
 		{
 			std::chrono::steady_clock::time_point observedAt{};
+			std::uint64_t ingressSequence{ 0u };
 			bool procOrigin{ false };
 			std::optional<RE::HitData> hitData;
 		};

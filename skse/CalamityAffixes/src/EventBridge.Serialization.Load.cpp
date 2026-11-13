@@ -1,4 +1,5 @@
 #include "CalamityAffixes/EventBridge.h"
+#include "CalamityAffixes/LootCurrencySourceHelpers.h"
 #include "CalamityAffixes/HostileEffectGuard.h"
 #include "CalamityAffixes/SummonProtectionSerialization.h"
 #include "CalamityAffixes/LootRollSelection.h"
@@ -67,6 +68,7 @@ namespace CalamityAffixes
 		SKSE::log::info("CalamityAffixes: Load() — deserializing co-save records.");
 
 		_instanceTrackingState.instanceAffixes.clear();
+		_instanceTrackingState.instanceBaseObjects.clear();
 		_instanceTrackingState.selectedReforgeCounts.clear();
 		_instanceTrackingState.equippedInstanceKeysByToken.clear();
 		_instanceTrackingState.equippedTokenCacheReady = false;
@@ -82,6 +84,13 @@ namespace CalamityAffixes
 		_combatState.ResetTransientState();
 		ClearTrapRuntimeState("load");
 		_runewordState.ResetSelectionAndProgress();
+		_feasrKnownRunewordRecipeIds.clear();
+		_feasrDiscoveryRevision.clear();
+		_feasrDiscoveryExpectedCount = 0u;
+		_feasrDiscoveryReceivedCount = 0u;
+		_feasrDiscoverySyncActive = false;
+		_feasrDiscoverySyncValid = false;
+		_feasrDiscoveryReady = false;
 		_combatState.ResetCorpseExplosionState();
 
 		std::uint32_t type = 0;
@@ -123,6 +132,9 @@ namespace CalamityAffixes
 				break;
 			case kSerializationRecordInstanceReforgeCounts:
 				LoadInstanceReforgeCountsRecord(a_intfc, version, length);
+				break;
+			case kSerializationRecordPendingDropOwnership:
+				LoadPendingDropOwnershipRecord(a_intfc, version, length);
 				break;
 			default:
 				DrainRecordBytes(a_intfc, length, "unknown-record");

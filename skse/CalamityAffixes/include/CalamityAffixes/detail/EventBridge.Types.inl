@@ -418,10 +418,29 @@
 			std::uint64_t resultAffixToken{ 0 };
 			std::optional<LootItemType> recommendedBaseType{};
 
-			// HUD notes are English sentences, and the English HUD font may lack Hangul.
-			[[nodiscard]] const std::string& HudName() const noexcept
+			// displayName/displayNameEn/displayNameKo above keep the upstream contract
+			// names. Player-facing English text goes through the FE-ASR presentation
+			// resolver below; id and runeIds stay the mechanical keys.
+
+			// English UI name: the FE-ASR name for manifest recipes, upstream English
+			// for anything else (empty when upstream has none).
+			[[nodiscard]] std::string PresentationNameEn() const
 			{
-				return displayNameEn.empty() ? displayName : displayNameEn;
+				return std::string(RuneforgePresentation::RecipeNameOr(id, displayNameEn));
+			}
+
+			// HUD notes are English sentences, and the English HUD font may lack Hangul.
+			[[nodiscard]] std::string HudName() const
+			{
+				return std::string(RuneforgePresentation::RecipeNameOr(
+					id,
+					displayNameEn.empty() ? std::string_view(displayName) : std::string_view(displayNameEn)));
+			}
+
+			// Player-facing rune sequence in mechanical order, e.g. "Eldr-Fenn-Draum".
+			[[nodiscard]] std::string PresentationRuneSequence() const
+			{
+				return RuneforgePresentation::PresentRuneSequence(runeIds);
 			}
 		};
 
@@ -672,4 +691,5 @@
 			kMissingResultAffix,
 			kAlreadyComplete,
 			kAffixSlotsFull,
+			kIneligibleBase,
 		};

@@ -22,6 +22,15 @@ namespace CalamityAffixes
 			return RunewordApplyBlockReason::kAlreadyComplete;
 		}
 
+		RE::InventoryEntryData* baseEntry = nullptr;
+		RE::ExtraDataList* baseXList = nullptr;
+		if (!ResolvePlayerInventoryInstance(a_instanceKey, baseEntry, baseXList) ||
+			!baseEntry || !baseEntry->object || !IsLootObjectEligibleForAffixes(baseEntry->object)) {
+			return RunewordApplyBlockReason::kIneligibleBase;
+		}
+
+
+
 		if (const auto it = _instanceTrackingState.instanceAffixes.find(a_instanceKey); it != _instanceTrackingState.instanceAffixes.end()) {
 			const auto& slots = it->second;
 			auto effectiveCount = slots.count;
@@ -57,6 +66,8 @@ namespace CalamityAffixes
 			reason.push_back(')');
 			return reason;
 		}
+		case RunewordApplyBlockReason::kIneligibleBase:
+			return "This item is not supported by Calamity for Runewords";
 		default:
 			break;
 		}

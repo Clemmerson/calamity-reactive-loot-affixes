@@ -89,6 +89,8 @@ find_package(nlohmann_json CONFIG REQUIRED)
 	    src/EventBridge.Loot.Runeword.Detail.cpp
 	    src/EventBridge.Loot.Runeword.Selection.cpp
 	    src/EventBridge.Loot.Runeword.BaseSelection.cpp
+	    src/EventBridge.Loot.Runeword.InventoryPreparation.cpp
+	    src/EventBridge.Loot.Runeword.Presentation.cpp
 	    src/EventBridge.Loot.Runeword.RecipeUi.cpp
 	    src/EventBridge.Loot.Runeword.RecipeEntries.cpp
 	    src/EventBridge.Loot.Runeword.PanelState.cpp
@@ -141,6 +143,8 @@ find_package(nlohmann_json CONFIG REQUIRED)
 	    src/PrismaTooltip.cpp
 	    src/RuntimePaths.cpp
 	    src/RunewordContractSnapshot.cpp
+	    src/RuneforgeMenu.cpp
+	    src/RuneforgeWorkstation.cpp
 	    src/RunewordIdentityOverrides.cpp
 	    src/TrapSystem.cpp
 	    src/EchoStrikeSystem.cpp

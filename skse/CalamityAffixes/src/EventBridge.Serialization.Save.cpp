@@ -1,5 +1,6 @@
 #include "CalamityAffixes/EventBridge.h"
 #include "CalamityAffixes/SerializationWireContract.h"
+#include "CalamityAffixes/LootCurrencySourceHelpers.h"
 
 #include <array>
 #include <cstdint>
@@ -26,6 +27,8 @@ namespace CalamityAffixes
 		static_assert(kMigrationFlagsVersion == SerializationWire::kMigrationFlags.version);
 		static_assert(kSerializationRecordInstanceReforgeCounts == SerializationWire::kInstanceReforgeCounts.type);
 		static_assert(kInstanceReforgeCountSerializationVersion == SerializationWire::kInstanceReforgeCounts.version);
+		static_assert(kSerializationRecordPendingDropOwnership == SerializationWire::kPendingDropOwnership.type);
+		static_assert(kPendingDropOwnershipSerializationVersion == SerializationWire::kPendingDropOwnership.version);
 
 		if (!a_intfc) {
 			return;
@@ -152,6 +155,24 @@ namespace CalamityAffixes
 				.baseFormId = static_cast<std::uint32_t>(key >> 16),
 				.uniqueId = static_cast<std::uint16_t>(key & 0xFFFFu),
 				.count = count,
+			});
+		}
+		snapshot.pendingDropOwnershipOverflow = _lootState.pendingDropOwnershipOverflow;
+		snapshot.pendingDropOwnershipOverflowExpiresAtDay =
+			_lootState.pendingDropOwnershipOverflowExpiresAtDay;
+		snapshot.pendingDropOwnership.reserve(_lootState.pendingDropOwnership.size());
+		for (const auto& pending : _lootState.pendingDropOwnership) {
+			if (pending.instanceKey == 0u || pending.baseObjectFormID == 0u ||
+				!IsPendingDropOwnershipLive(pending, detail::GetInGameDayStamp())) {
+				continue;
+			}
+			snapshot.pendingDropOwnership.push_back({
+				.ownerFormId = static_cast<std::uint32_t>(pending.instanceKey >> 16u),
+				.uniqueId = static_cast<std::uint16_t>(pending.instanceKey & 0xFFFFu),
+				.baseFormId = pending.baseObjectFormID,
+				.expiresAtDay = pending.expiresAtDay,
+				.referenceFormId = pending.referenceFormID,
+				.referenceIdentityEstablished = static_cast<std::uint8_t>(pending.referenceIdentityEstablished ? 1u : 0u),
 			});
 		}
 

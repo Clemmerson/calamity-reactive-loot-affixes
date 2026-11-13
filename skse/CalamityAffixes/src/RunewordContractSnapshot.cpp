@@ -1,4 +1,6 @@
 #include "CalamityAffixes/RunewordContractSnapshot.h"
+#include "CalamityAffixes/RunewordContractCompatibilityPolicy.h"
+#include "CalamityAffixes/RuntimeContractDocumentPolicy.h"
 
 #include "CalamityAffixes/RuntimeContract.h"
 #include "CalamityAffixes/RuntimePaths.h"
@@ -104,13 +106,12 @@ namespace CalamityAffixes
 		}
 
 		nlohmann::json contract = nlohmann::json::object();
-		try {
-			in >> contract;
-		} catch (const std::exception& e) {
+		std::string parseError;
+		if (!RuntimeContractDocumentPolicy::Parse(in, contract, parseError)) {
 			SKSE::log::warn(
 				"CalamityAffixes: runeword contract snapshot parse failed at {} ({}).",
 				contractPath.string(),
-				e.what());
+				parseError);
 			return false;
 		}
 
@@ -126,12 +127,20 @@ namespace CalamityAffixes
 		}
 
 		snapshot.recipes.reserve(catalogIt->size());
+		std::unordered_set<std::string> recipeIds;
 		for (const auto& entry : *catalogIt) {
 			RunewordContractRecipeRow row{};
 			if (!ParseRunewordRecipeRow(entry, row)) {
 				SKSE::log::warn(
 					"CalamityAffixes: invalid runeword recipe entry in '{}' at {}.",
 					RuntimeContract::kFieldRunewordCatalog,
+					contractPath.string());
+				return false;
+			}
+			if (!recipeIds.emplace(row.id).second) {
+				SKSE::log::warn(
+					"CalamityAffixes: duplicate runeword recipe id '{}' in {}.",
+					row.id,
 					contractPath.string());
 				return false;
 			}
@@ -189,7 +198,13 @@ namespace CalamityAffixes
 				return false;
 			}
 
-			snapshot.runeWeightsByName[runeName] = weight;
+			if (!RunewordContractCompatibilityPolicy::AddUniqueRuneWeight(snapshot, runeName, weight)) {
+				SKSE::log::warn(
+					"CalamityAffixes: duplicate rune weight entry for '{}' in {}.",
+					runeName,
+					contractPath.string());
+				return false;
+			}
 		}
 
 		if (snapshot.runeWeightsByName.empty()) {

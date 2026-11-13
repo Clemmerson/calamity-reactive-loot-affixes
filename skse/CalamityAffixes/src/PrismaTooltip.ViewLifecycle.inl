@@ -129,6 +129,9 @@
 		g_runewordCache.recipeListJson.clear();
 		g_runewordCache.panelStateJson.clear();
 		g_runewordCache.affixPreview.clear();
+		if (g_runeforgeReaderOpen.load(std::memory_order_acquire)) {
+			g_runeforgeReaderNeedsPush = true;
+		}
 		RequestRunewordPanelRefresh(true);
 		g_nextPanelSafetyRefreshAt = {};
 	}
@@ -137,6 +140,12 @@
 	{
 		g_api->RegisterJSListener(g_view, kPrismaCommandListener, [](const char* a_argument) {
 			const std::string command = a_argument ? std::string(a_argument) : std::string();
+			// Reader commands bypass the task queue (R8.7.4.14, live U1): they go to the reader mailbox, which the input
+			// sink drains every frame.
+			if (RuneforgeReaderContract::IsReaderCommand(command)) {
+				PostRuneforgeReaderJsCommand(command);
+				return;
+			}
 			QueueTask([command]() {
 				HandleUiCommand(command);
 			});
@@ -282,8 +291,216 @@
 		return CreatePrismaView(now);
 	}
 
+	// R8.7.4.14 reader input/exit contract (include/CalamityAffixes/RuneforgeReaderInputContract.h).
+	void ResetRuneforgeReaderSessionState()
+	{
+		g_runeforgeReaderFocusConfirmed = false;
+		g_runeforgeReaderFocusRequests = 0u;
+		g_runeforgeReaderAckSeen = false;
+		g_runeforgeReaderAckWarned = false;
+		g_runeforgeReaderPushedAt = {};
+		g_runeforgeReaderNextServiceAt = {};
+		g_runeforgeReaderCloseKeysArmed = 0u;
+		g_runeforgeReaderAckPending.store(false, std::memory_order_release);
+		g_runeforgeReaderPointerReports.store(0u, std::memory_order_release);
+		std::scoped_lock mailboxLock(g_runeforgeReaderMailboxMutex);
+		g_runeforgeReaderMailbox.clear();
+	}
+
+	void RequestRuneforgeReaderFocus()
+	{
+		++g_runeforgeReaderFocusRequests;
+		const bool accepted = g_api->Focus(g_view, RuneforgeReaderContract::kFocusPausesGame, RuneforgeReaderContract::kFocusDisablesFocusMenu);
+		if (g_runeforgeReaderFocusRequests == 1u || !accepted) {
+			SKSE::log::info("Runeforge reader focus request #{} accepted={} pauseGame={}",
+				g_runeforgeReaderFocusRequests, accepted, RuneforgeReaderContract::kFocusPausesGame);
+		}
+	}
+
+	void CloseRuneforgeReaderOnGameThread(RuneforgeReaderContract::Source a_reason)
+	{
+		std::scoped_lock lock(g_runeforgeReaderMutex);
+		const bool wasOpen = g_runeforgeReaderOpen.exchange(false, std::memory_order_acq_rel);
+		g_runeforgeReaderNeedsPush = false;
+		const bool focusWasConfirmed = g_runeforgeReaderFocusConfirmed;
+		const bool ackSeen = g_runeforgeReaderAckSeen;
+		ResetRuneforgeReaderSessionState();
+		if (!wasOpen) {
+			return;
+		}
+		bool focusReleased = false;
+		if (g_api && g_view && g_api->IsValid(g_view)) {
+			if (IsViewReady()) {
+				g_api->InteropCall(g_view, kInteropSetRuneforgeReaderVisible, "0");
+			}
+			if (g_api->HasFocus(g_view)) {
+				g_api->Unfocus(g_view);
+				focusReleased = true;
+			}
+			const bool anotherUiNeedsView = g_controlPanelOpen.load() || g_relevantMenusOpen.load() > 0 || !g_lastTooltip.empty();
+			SetVisible(anotherUiNeedsView);
+		}
+		SKSE::log::info("Runeforge reader closed reason={} focusReleased={} focusWasConfirmed={} jsAck={}",
+			RuneforgeReaderContract::ToString(a_reason), focusReleased, focusWasConfirmed, ackSeen);
+	}
+
+	void ApplyRuneforgeReaderAction(RuneforgeReaderContract::Action a_action, RuneforgeReaderContract::Source a_source)
+	{
+		if (a_action == RuneforgeReaderContract::Action::kNone) {
+			return;
+		}
+		std::scoped_lock lock(g_runeforgeReaderMutex);
+		if (!g_runeforgeReaderOpen.load(std::memory_order_acquire) || g_runeforgeReaderDocument.pages.empty()) {
+			return;
+		}
+		const auto count = g_runeforgeReaderDocument.pages.size();
+		const auto before = g_runeforgeReaderPage;
+		const auto result = RuneforgeReaderContract::Apply(before, count, a_action);
+		SKSE::log::info("Runeforge reader input source={} action={} page={}->{} of {}{}",
+			RuneforgeReaderContract::ToString(a_source), RuneforgeReaderContract::ToString(a_action),
+			before + 1u, result.page + 1u, count, result.close ? " close" : "");
+		if (result.close) {
+			CloseRuneforgeReaderOnGameThread(a_source);
+			return;
+		}
+		if (!result.changed) {
+			return;
+		}
+		g_runeforgeReaderPage = result.page;
+		if (IsViewReady()) {
+			const auto page = std::to_string(g_runeforgeReaderPage);
+			g_api->InteropCall(g_view, kInteropSetRuneforgeReaderPage, page.c_str());
+		}
+	}
+
+	// Called from the JS listener. Never takes the reader mutex and never touches Prisma: it only records the command.
+	void PostRuneforgeReaderJsCommand(std::string_view a_command)
+	{
+		if (RuneforgeReaderContract::IsPointerReport(a_command)) {
+			// Evidence only (no lock, no Prisma call, no page change): where did a mouse press land?
+			if (g_runeforgeReaderOpen.load(std::memory_order_acquire) &&
+				g_runeforgeReaderPointerReports.fetch_add(1u, std::memory_order_acq_rel) < RuneforgeReaderContract::kMaxPointerReports) {
+				SKSE::log::info("Runeforge reader pointer down at={}", RuneforgeReaderContract::SanitizePointerReport(a_command));
+			}
+			return;
+		}
+		if (a_command == RuneforgeReaderContract::kJsAck) {
+			g_runeforgeReaderAckPending.store(true, std::memory_order_release);
+		} else {
+			const auto action = RuneforgeReaderContract::ParseJsCommand(a_command);
+			if (action == RuneforgeReaderContract::Action::kNone) {
+				return;
+			}
+			std::scoped_lock mailboxLock(g_runeforgeReaderMailboxMutex);
+			if (g_runeforgeReaderMailbox.size() >= RuneforgeReaderContract::kMaxPendingActions) {
+				return;
+			}
+			g_runeforgeReaderMailbox.push_back(action);
+		}
+		// Second drain path; the input-device sink also drains every frame, so neither path alone is required.
+		QueueTask([]() { ServiceRuneforgeReader(); });
+	}
+
+	// Drains the JS mailbox and enforces the focus contract. Runs from the input-device sink (every frame while the reader
+	// is open) and from the tick. It never blocks: a contended pass is retried on the next frame.
+	void ServiceRuneforgeReader()
+	{
+		std::unique_lock lock(g_runeforgeReaderMutex, std::try_to_lock);
+		if (!lock.owns_lock()) {
+			return;
+		}
+		std::vector<RuneforgeReaderContract::Action> pending;
+		{
+			std::scoped_lock mailboxLock(g_runeforgeReaderMailboxMutex);
+			pending.swap(g_runeforgeReaderMailbox);
+		}
+		if (!g_runeforgeReaderOpen.load(std::memory_order_acquire)) {
+			return;
+		}
+		if (g_runeforgeReaderAckPending.exchange(false, std::memory_order_acq_rel) && !g_runeforgeReaderAckSeen) {
+			g_runeforgeReaderAckSeen = true;
+			SKSE::log::info("Runeforge reader JS route confirmed (ack) pages={}", g_runeforgeReaderDocument.pages.size());
+		}
+		for (const auto action : pending) {
+			ApplyRuneforgeReaderAction(action, RuneforgeReaderContract::Source::kJs);
+			if (!g_runeforgeReaderOpen.load(std::memory_order_acquire)) {
+				return;
+			}
+		}
+		if (!g_api || !g_view || !g_api->IsValid(g_view) || !IsViewReady() || g_runeforgeReaderNeedsPush) {
+			return;
+		}
+		const auto now = std::chrono::steady_clock::now();
+		if (g_runeforgeReaderNextServiceAt.time_since_epoch().count() != 0 && now < g_runeforgeReaderNextServiceAt) {
+			return;
+		}
+		g_runeforgeReaderNextServiceAt = now + std::chrono::milliseconds(250);
+		if (!g_runeforgeReaderAckSeen && !g_runeforgeReaderAckWarned &&
+			g_runeforgeReaderPushedAt.time_since_epoch().count() != 0 && now - g_runeforgeReaderPushedAt > std::chrono::seconds(3)) {
+			g_runeforgeReaderAckWarned = true;
+			SKSE::log::warn("Runeforge reader: no JS ack 3 s after the document push; button route unconfirmed (keyboard and gamepad stay native).");
+		}
+		switch (RuneforgeReaderContract::DecideFocus(g_runeforgeReaderFocusConfirmed, g_api->HasFocus(g_view), g_runeforgeReaderFocusRequests)) {
+		case RuneforgeReaderContract::FocusDecision::kConfirm:
+			g_runeforgeReaderFocusConfirmed = true;
+			SKSE::log::info("Runeforge reader focus confirmed after {} request(s)", g_runeforgeReaderFocusRequests);
+			break;
+		case RuneforgeReaderContract::FocusDecision::kRequest:
+			RequestRuneforgeReaderFocus();
+			break;
+		case RuneforgeReaderContract::FocusDecision::kCloseLost:
+			CloseRuneforgeReaderOnGameThread(RuneforgeReaderContract::Source::kFocusLost);
+			break;
+		case RuneforgeReaderContract::FocusDecision::kCloseUnavailable:
+			SKSE::log::warn("Runeforge reader: focus not acquired after {} requests; closing instead of leaving the reader without input.",
+				g_runeforgeReaderFocusRequests);
+			CloseRuneforgeReaderOnGameThread(RuneforgeReaderContract::Source::kFocusUnavailable);
+			break;
+		case RuneforgeReaderContract::FocusDecision::kHold:
+		default:
+			break;
+		}
+	}
+
+	void TickRuneforgeReader()
+	{
+		std::scoped_lock lock(g_runeforgeReaderMutex);
+		if (!g_runeforgeReaderOpen.load(std::memory_order_acquire) || !IsViewReady()) {
+			return;
+		}
+		if (g_runeforgeReaderNeedsPush) {
+			g_controlPanelOpen.store(false, std::memory_order_release);
+			SetControlPanelJsState(false);
+			const nlohmann::json payload = {
+				{"title", g_runeforgeReaderDocument.title},
+				{"substrate", g_runeforgeReaderDocument.substrate},
+				{"pages", g_runeforgeReaderDocument.pages},
+			};
+			const auto serialized = payload.dump();
+			g_api->InteropCall(g_view, kInteropSetRuneforgeReader, serialized.c_str());
+			if (g_runeforgeReaderPage > 0) {
+				const auto page = std::to_string(g_runeforgeReaderPage);
+				g_api->InteropCall(g_view, kInteropSetRuneforgeReaderPage, page.c_str());
+			}
+			g_api->InteropCall(g_view, kInteropSetRuneforgeReaderVisible, "1");
+			g_runeforgeReaderNeedsPush = false;
+			g_runeforgeReaderPushedAt = std::chrono::steady_clock::now();
+			SetVisible(true);
+			if (!g_api->HasFocus(g_view)) {
+				RequestRuneforgeReaderFocus();
+			}
+			g_runeforgeReaderNextServiceAt = g_runeforgeReaderPushedAt + std::chrono::milliseconds(250);
+			return;
+		}
+		SetVisible(true);
+		ServiceRuneforgeReader();
+	}
+
 	void SetControlPanelOpenImpl(bool a_open)
 	{
+		if (a_open && g_runeforgeReaderOpen.load(std::memory_order_acquire)) {
+			CloseRuneforgeReaderOnGameThread(RuneforgeReaderContract::Source::kPanelOpened);
+		}
 		if (!a_open) {
 			g_controlPanelOpen.store(false);
 			ApplyControlPanelState(false);
@@ -339,6 +556,7 @@
 				if (g_gatePollingOnMenus.load() &&
 					g_relevantMenusOpen.load() <= 0 &&
 					!g_controlPanelOpen.load() &&
+					!g_runeforgeReaderOpen.load() &&
 					g_prismaStatus.load() != PrismaAvailabilityStatus::kViewLoading) {
 					continue;
 				}

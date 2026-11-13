@@ -1,4 +1,5 @@
 #include "CalamityAffixes/EventBridge.h"
+#include "CalamityAffixes/RunewordUiPresentation.h"
 #include "EventBridge.Loot.Runeword.Detail.h"
 #include "EventBridge.Loot.Runeword.SummaryText.h"
 
@@ -127,6 +128,245 @@ namespace CalamityAffixes
 
 		static_assert(!HasDuplicateOverrideIds(kRecommendedBaseOverrides),
 			"kRecommendedBaseOverrides must not contain duplicate recipe ids.");
+
+		// ---- R8.7.4.21 I3: RunewordEffectCard v1 adapter (RE -> pure CardInput) -----------------------------------
+		namespace EC = RunewordEffectCardPolicy;
+
+		// RunewordEffectCardPolicy::kAvLabels keys (Mutagen/affixes.json spelling). Anything else stays unmapped and the
+		// card shows a generic "Effect n" with the raw magnitude.
+		[[nodiscard]] std::string_view CardActorValueName(RE::ActorValue a_av) noexcept
+		{
+			using AV = RE::ActorValue;
+			switch (a_av) {
+			case AV::kNone: return {};
+			case AV::kHealth: return "Health";
+			case AV::kMagicka: return "Magicka";
+			case AV::kStamina: return "Stamina";
+			case AV::kHealRate: return "HealRate";
+			case AV::kMagickaRate: return "MagickaRate";
+			case AV::KStaminaRate: return "StaminaRate";
+			case AV::kHealRateMult: return "HealRateMult";
+			case AV::kMagickaRateMult: return "MagickaRateMult";
+			case AV::kStaminaRateMult: return "StaminaRateMult";
+			case AV::kSpeedMult: return "SpeedMult";
+			case AV::kAttackDamageMult: return "AttackDamageMult";
+			case AV::kWeaponSpeedMult: return "WeaponSpeedMult";
+			case AV::kLeftWeaponSpeedMultiply: return "LeftWeaponSpeedMult";
+			case AV::kDamageResist: return "DamageResist";
+			case AV::kResistFire: return "ResistFire";
+			case AV::kResistFrost: return "ResistFrost";
+			case AV::kResistShock: return "ResistShock";
+			case AV::kResistMagic: return "ResistMagic";
+			case AV::kPoisonResist: return "PoisonResist";
+			case AV::kResistDisease: return "ResistDisease";
+			case AV::kReflectDamage: return "ReflectDamage";
+			case AV::kAbsorbChance: return "AbsorbChance";
+			case AV::kCriticalChance: return "CriticalChance";
+			case AV::kCarryWeight: return "CarryWeight";
+			case AV::kOneHandedModifier: return "OneHandedModifier";
+			case AV::kTwoHandedModifier: return "TwoHandedModifier";
+			case AV::kMarksmanModifier: return "MarksmanModifier";
+			case AV::kBlockModifier: return "BlockModifier";
+			case AV::kSmithingModifier: return "SmithingModifier";
+			case AV::kHeavyArmorModifier: return "HeavyArmorModifier";
+			case AV::kLightArmorModifier: return "LightArmorModifier";
+			case AV::kPickpocketModifier: return "PickpocketModifier";
+			case AV::kLockpickingModifier: return "LockpickingModifier";
+			case AV::kSneakingModifier: return "SneakingModifier";
+			case AV::kAlchemyModifier: return "AlchemyModifier";
+			case AV::kSpeechcraftModifier: return "SpeechcraftModifier";
+			case AV::kAlterationModifier: return "AlterationModifier";
+			case AV::kConjurationModifier: return "ConjurationModifier";
+			case AV::kDestructionModifier: return "DestructionModifier";
+			case AV::kIllusionModifier: return "IllusionModifier";
+			case AV::kRestorationModifier: return "RestorationModifier";
+			case AV::kEnchantingModifier: return "EnchantingModifier";
+			case AV::kBowSpeedBonus: return "BowSpeedBonus";
+			case AV::kShoutRecoveryMult: return "ShoutRecoveryMult";
+			case AV::kDetectLifeRange: return "DetectLifeRange";
+			case AV::kAggresion: return "Aggression";
+			case AV::kConfidence: return "Confidence";
+			case AV::kParalysis: return "Paralysis";
+			case AV::kInvisibility: return "Invisibility";
+			default: return "Unmapped";
+			}
+		}
+
+		[[nodiscard]] EC::Archetype CardArchetype(RE::EffectArchetypes::ArchetypeID a_archetype) noexcept
+		{
+			using A = RE::EffectArchetypes::ArchetypeID;
+			switch (a_archetype) {
+			case A::kValueModifier: return EC::Archetype::kValueModifier;
+			case A::kPeakValueModifier: return EC::Archetype::kPeakValueModifier;
+			case A::kDualValueModifier: return EC::Archetype::kDualValueModifier;
+			case A::kAbsorb: return EC::Archetype::kAbsorb;
+			case A::kInvisibility: return EC::Archetype::kInvisibility;
+			case A::kEtherealize: return EC::Archetype::kEtherealize;
+			case A::kParalysis: return EC::Archetype::kParalysis;
+			case A::kCalm: return EC::Archetype::kCalm;
+			case A::kFrenzy: return EC::Archetype::kFrenzy;
+			case A::kDemoralize: return EC::Archetype::kDemoralize;
+			case A::kTurnUndead: return EC::Archetype::kTurnUndead;
+			case A::kDetectLife: return EC::Archetype::kDetectLife;
+			case A::kScript: return EC::Archetype::kScript;
+			default: return EC::Archetype::kOther;
+			}
+		}
+
+		[[nodiscard]] std::string_view CardResistName(RE::ActorValue a_av) noexcept
+		{
+			switch (a_av) {
+			case RE::ActorValue::kResistFire: return "ResistFire";
+			case RE::ActorValue::kResistFrost: return "ResistFrost";
+			case RE::ActorValue::kResistShock: return "ResistShock";
+			case RE::ActorValue::kResistMagic: return "ResistMagic";
+			case RE::ActorValue::kPoisonResist: return "PoisonResist";
+			case RE::ActorValue::kResistDisease: return "ResistDisease";
+			default: return {};
+			}
+		}
+
+		// The loaded record values at call time (the same SpellItem the action casts).
+		[[nodiscard]] std::vector<EC::EffectInput> CardEffects(const RE::SpellItem* a_spell)
+		{
+			std::vector<EC::EffectInput> out;
+			if (!a_spell) {
+				return out;
+			}
+			for (const auto* effect : a_spell->effects) {
+				if (!effect || !effect->baseEffect) {
+					continue;
+				}
+				const auto* mgef = effect->baseEffect;
+				EC::EffectInput e{};
+				e.actorValue = std::string(CardActorValueName(mgef->data.primaryAV));
+				e.resistValue = std::string(CardResistName(mgef->data.resistVariable));
+				e.archetype = CardArchetype(mgef->GetArchetype());
+				// The engine subtracts the magnitude of detrimental effects (the generator sets Hostile|Detrimental).
+				e.hostile = mgef->IsDetrimental();
+				e.recover = mgef->data.flags.all(RE::EffectSetting::EffectSettingData::Flag::kRecover);
+				e.magnitude = effect->effectItem.magnitude;
+				e.durationS = static_cast<float>(effect->effectItem.duration);
+				e.area = static_cast<float>(effect->effectItem.area);
+				const char* name = mgef->GetName();
+				e.recordName = name ? name : "";
+				out.push_back(std::move(e));
+			}
+			return out;
+		}
+
+		[[nodiscard]] float Seconds(std::chrono::milliseconds a_ms) noexcept
+		{
+			return static_cast<float>(a_ms.count()) / 1000.0f;
+		}
+	}
+
+	RunewordEffectCardPolicy::CardInput EventBridge::BuildRunewordEffectCardInput(
+		const AffixRuntime& a_affix,
+		const RunewordRecipe& a_recipe) const
+	{
+		EC::CardInput in{};
+		in.recipeId = a_recipe.id;
+		in.internalRunes = a_recipe.runeIds;
+		in.upstreamName = a_recipe.displayNameEn;
+		switch (a_affix.trigger) {
+		case Trigger::kHit: in.trigger = EC::Trigger::kHit; break;
+		case Trigger::kIncomingHit: in.trigger = EC::Trigger::kIncomingHit; break;
+		case Trigger::kDotApply: in.trigger = EC::Trigger::kDotApply; break;
+		case Trigger::kKill: in.trigger = EC::Trigger::kKill; break;
+		case Trigger::kLowHealth: in.trigger = EC::Trigger::kLowHealth; break;
+		}
+		in.procChancePct = a_affix.procChancePct;
+		in.icdS = Seconds(a_affix.icd);
+		in.perTargetIcdS = Seconds(a_affix.perTargetIcd);
+		if (a_affix.trigger == Trigger::kLowHealth) {
+			in.lowHealthThresholdPct = a_affix.lowHealthThresholdPct;
+			in.lowHealthRearmPct = a_affix.lowHealthRearmPct;
+		}
+		in.requireRecentlyHitS = Seconds(a_affix.requireRecentlyHit);
+		in.requireRecentlyKillS = Seconds(a_affix.requireRecentlyKill);
+		in.requireNotHitRecentlyS = Seconds(a_affix.requireNotHitRecently);
+		in.luckyHitChancePct = a_affix.luckyHitChancePct;
+
+		const auto& action = a_affix.action;
+		in.applyToSelf = action.applyToSelf;
+		in.passiveOnly = a_affix.procChancePct <= 0.0f && action.type == ActionType::kDebugNotify && a_affix.passiveSpell != nullptr;
+		switch (action.type) {
+		case ActionType::kCastSpell: in.action = EC::ActionKind::kCastSpell; break;
+		case ActionType::kCastSpellAdaptiveElement: in.action = EC::ActionKind::kAdaptive; break;
+		case ActionType::kCastOnCrit: in.action = EC::ActionKind::kCastOnCrit; break;
+		case ActionType::kConvertDamage: in.action = EC::ActionKind::kConvertDamage; break;
+		case ActionType::kMindOverMatter: in.action = EC::ActionKind::kMindOverMatter; break;
+		case ActionType::kArchmage: in.action = EC::ActionKind::kArchmage; break;
+		case ActionType::kCorpseExplosion: in.action = EC::ActionKind::kCorpseExplosion; break;
+		case ActionType::kSummonCorpseExplosion: in.action = EC::ActionKind::kSummonCorpseExplosion; break;
+		case ActionType::kSpawnTrap: in.action = EC::ActionKind::kSpawnTrap; break;
+		case ActionType::kEchoStrike: in.action = EC::ActionKind::kEchoStrike; break;
+		case ActionType::kDebugNotify: in.action = EC::ActionKind::kOther; break;
+		}
+		if (action.type == ActionType::kCastSpellAdaptiveElement) {
+			std::unordered_set<RE::SpellItem*> seen;
+			const std::pair<EC::Element, RE::SpellItem*> spells[] = {
+				{ EC::Element::kFire, action.adaptiveFire }, { EC::Element::kFrost, action.adaptiveFrost }, { EC::Element::kShock, action.adaptiveShock } };
+			for (const auto& [element, spell] : spells) {
+				if (spell && seen.insert(spell).second) {
+					in.adaptive.push_back({ element, CardEffects(spell) });
+				}
+			}
+			in.adaptiveStrongest = action.adaptiveMode == AdaptiveElementMode::kStrongestResist;
+		} else if (action.type != ActionType::kDebugNotify) {
+			in.effects = CardEffects(action.spell);
+		}
+		if (a_affix.passiveSpell && a_affix.passiveSpell != action.spell) {
+			in.passiveEffects = CardEffects(a_affix.passiveSpell);
+		}
+		switch (action.magnitudeScaling.source) {
+		case MagnitudeScaling::Source::kHitPhysicalDealt: in.scaling.source = EC::ScaleSource::kHitPhysical; break;
+		case MagnitudeScaling::Source::kHitTotalDealt: in.scaling.source = EC::ScaleSource::kHitTotal; break;
+		case MagnitudeScaling::Source::kNone: in.scaling.source = EC::ScaleSource::kNone; break;
+		}
+		in.scaling.mult = action.magnitudeScaling.mult;
+		in.scaling.add = action.magnitudeScaling.add;
+		in.scaling.min = action.magnitudeScaling.min;
+		in.scaling.max = action.magnitudeScaling.max;
+		in.scaling.spellBaseAsMin = action.magnitudeScaling.spellBaseAsMin;
+		in.magnitudeOverride = action.magnitudeOverride;
+		in.effectiveness = action.effectiveness;
+		in.corpseFlatDamage = action.corpseExplosionFlatDamage;
+		in.corpsePctOfMaxHealth = action.corpseExplosionPctOfCorpseMaxHealth;
+		in.corpseRadius = action.corpseExplosionRadius;
+		in.corpseMaxTargets = action.corpseExplosionMaxTargets;
+		in.corpseMaxChainDepth = action.corpseExplosionMaxChainDepth;
+		in.corpseChainFalloff = action.corpseExplosionChainFalloff;
+		if (action.type == ActionType::kSpawnTrap) {
+			in.trapRadius = action.trapRadius;
+			in.trapTtlS = Seconds(action.trapTtl);
+		}
+		if (action.type == ActionType::kEchoStrike) {
+			in.echoDelayS = Seconds(action.echoDelay);
+			in.echoWindowS = Seconds(action.echoWindow);
+			in.echoRequirePowerAttack = action.echoRequirePowerAttack;
+		}
+		if (action.evolutionEnabled) {
+			in.evolutionThresholds = action.evolutionThresholds;
+			in.evolutionMultipliers = action.evolutionMultipliers;
+		}
+		switch (action.element) {
+		case Element::kFire: in.convertElement = EC::Element::kFire; break;
+		case Element::kFrost: in.convertElement = EC::Element::kFrost; break;
+		case Element::kShock: in.convertElement = EC::Element::kShock; break;
+		default: in.convertElement = EC::Element::kNone; break;
+		}
+		if (action.type == ActionType::kConvertDamage) in.convertPct = action.convertPct;
+		if (action.type == ActionType::kMindOverMatter) {
+			in.mindOverMatterPct = action.mindOverMatterDamageToMagickaPct;
+			in.mindOverMatterMaxPerHit = action.mindOverMatterMaxRedirectPerHit;
+		}
+		if (action.type == ActionType::kArchmage) {
+			in.archmageDamagePctOfMaxMagicka = action.archmageDamagePctOfMaxMagicka;
+			in.archmageCostPctOfMaxMagicka = action.archmageCostPctOfMaxMagicka;
+		}
+		return in;
 	}
 
 	std::vector<EventBridge::RunewordRecipeEntry> EventBridge::GetRunewordRecipeEntries()
@@ -558,7 +798,7 @@ namespace CalamityAffixes
 			       a_affix.passiveSpell != nullptr;
 		};
 		auto passiveEffectName = [&](const AffixRuntime& a_affix, bool a_korean) {
-			const auto& localizedName = a_korean ? a_affix.displayNameKo : a_affix.displayNameEn;
+			const auto localizedName = a_korean ? a_affix.displayNameKo : ResolveAffixDisplayNameEn(a_affix);
 			if (!localizedName.empty()) {
 				return localizedName;
 			}
@@ -640,6 +880,50 @@ namespace CalamityAffixes
 			} else {
 				summary.append(actionSummaryTextEn(a_affix.action));
 			}
+
+			const float icdSeconds = static_cast<float>(a_affix.icd.count()) / 1000.0f;
+			if (icdSeconds > 0.0f) {
+				summary.append(" (Cooldown ");
+				summary.append(formatNumberCompact(icdSeconds));
+				summary.append("s)");
+			}
+
+			const float perTargetIcdSeconds = static_cast<float>(a_affix.perTargetIcd.count()) / 1000.0f;
+			if (perTargetIcdSeconds > 0.0f) {
+				summary.append(" (Per-target cooldown ");
+				summary.append(formatNumberCompact(perTargetIcdSeconds));
+				summary.append("s)");
+			}
+
+			const float durationSeconds = actionDurationSeconds(a_affix.action);
+			if (durationSeconds > 0.0f) {
+				summary.append(" (Duration ");
+				summary.append(formatNumberCompact(durationSeconds));
+				summary.append("s)");
+			}
+			return summary;
+		};
+
+		// FE-ASR recipes: the same trigger/chance/cooldown sentence, built around the
+		// manifest's qualitative effect instead of upstream action or spell names.
+		auto buildPublicEffectSummaryTextEn = [&](const AffixRuntime& a_affix, std::string_view a_publicEffect) {
+			if (isPassiveOnlySentinel(a_affix)) {
+				return "Always active: " + std::string(a_publicEffect);
+			}
+
+			std::string summary;
+			summary.append(a_affix.action.type == ActionType::kEchoStrike && a_affix.action.echoRequirePowerAttack ?
+					std::string_view{ "On power attack hit" } :
+					triggerTextEn(a_affix.trigger));
+			const auto chancePct = std::clamp(a_affix.procChancePct, 0.0f, 100.0f);
+			if (chancePct > 0.0f) {
+				summary.append(", ");
+				summary.append(formatNumberCompact(chancePct));
+				summary.append("% chance: ");
+			} else {
+				summary.append(", always: ");
+			}
+			summary.append(a_publicEffect);
 
 			const float icdSeconds = static_cast<float>(a_affix.icd.count()) / 1000.0f;
 			if (icdSeconds > 0.0f) {
@@ -1023,6 +1307,7 @@ namespace CalamityAffixes
 			}
 
 			entries.push_back(RunewordRecipeEntry{
+				.recipeId = recipe.id,
 				.recipeToken = recipe.token,
 				.displayName = recipe.displayName,
 				.displayNameEn = recipe.displayNameEn,
@@ -1037,9 +1322,35 @@ namespace CalamityAffixes
 				.recommendedBaseKey = std::string(resolveRecommendedBaseKey(recipe)),
 				.selected = (selectedToken != 0u && selectedToken == recipe.token)
 			});
+
+			// FE-ASR presentation boundary for the English display fields; recipeId,
+			// recipeToken and runeTokens above stay mechanical.
+			const auto publicEffect = RuneforgePresentation::EffectSummary(recipe.id);
+			RunewordUiPresentation::ApplyRecipeEntryPresentation(
+				entries.back(),
+				recipe.runeIds,
+				recipe.displayNameEn,
+				publicEffect.empty() ? std::string{} : buildPublicEffectSummaryTextEn(affix, publicEffect));
+			// R8.7.4.21 I3: the formula-level effect card (base proc chance) for the menu snapshot and the workstation.
+			entries.back().effectCard = RunewordEffectCardPolicy::Build(BuildRunewordEffectCardInput(affix, recipe));
 		}
 
 		return entries;
+	}
+
+	bool EventBridge::IsFeasrRuneforgeDiscoveryReady() const
+	{
+		const std::scoped_lock lock(_stateMutex);
+		return _feasrDiscoveryReady;
+	}
+
+	bool EventBridge::IsFeasrRunewordRecipeKnown(std::string_view a_recipeId) const
+	{
+		if (a_recipeId.empty()) {
+			return false;
+		}
+		const std::scoped_lock lock(_stateMutex);
+		return _feasrDiscoveryReady && _feasrKnownRunewordRecipeIds.contains(std::string(a_recipeId));
 	}
 
 }

@@ -631,6 +631,71 @@
 		}
 	}
 
+	void EventBridge::LoadPendingDropOwnershipRecord(
+		SKSE::SerializationInterface* a_intfc,
+		std::uint32_t a_version,
+		std::uint32_t a_length)
+	{
+		if (a_version < 1u || a_version > kPendingDropOwnershipSerializationVersion) {
+			DrainRecordBytes(a_intfc, a_length, "unsupported-pdop-version");
+			return;
+		}
+
+		SerializationLoadCursor cursor{ .intfc = a_intfc, .length = a_length };
+		auto readScalar = [&cursor]<std::unsigned_integral T>(T& a_value) {
+			return cursor.Read(a_value);
+		};
+		auto apply = [&](const SerializationWire::PendingDropOwnershipEntry& a_entry) {
+			RE::FormID resolvedOwnerID = 0u;
+			RE::FormID resolvedBaseID = 0u;
+			if (a_entry.ownerFormId == 0u || a_entry.uniqueId == 0u ||
+				a_entry.baseFormId == 0u || a_entry.expiresAtDay == 0u ||
+				!a_intfc->ResolveFormID(a_entry.ownerFormId, resolvedOwnerID) ||
+				!a_intfc->ResolveFormID(a_entry.baseFormId, resolvedBaseID) ||
+				resolvedOwnerID == 0u || resolvedBaseID == 0u) {
+				return;
+			}
+			const auto key = MakeInstanceKey(resolvedOwnerID, a_entry.uniqueId);
+			const auto result = TrackPendingDropOwnership(
+				_lootState.pendingDropOwnership,
+				key,
+				resolvedBaseID,
+				a_entry.expiresAtDay,
+				a_entry.referenceFormId,
+				a_entry.referenceIdentityEstablished != 0u);
+			if (result == PendingDropTrackResult::kConflict ||
+				result == PendingDropTrackResult::kFull) {
+				_lootState.pendingDropOwnershipOverflow = true;
+				_lootState.pendingDropOwnershipOverflowExpiresAtDay =
+					std::max(_lootState.pendingDropOwnershipOverflowExpiresAtDay, a_entry.expiresAtDay);
+			}
+		};
+		const auto result = SerializationWire::ReadCurrentPendingDropOwnershipPayload(readScalar, apply, a_version);
+		if (result.status == SerializationWire::PendingDropOwnershipReadStatus::kSizeLimitExceeded) {
+			_lootState.pendingDropOwnershipOverflow = true;
+			_lootState.pendingDropOwnershipOverflowExpiresAtDay =
+				std::max(_lootState.pendingDropOwnershipOverflowExpiresAtDay,
+						detail::GetInGameDayStamp() + kPendingDropOwnershipLifetimeDays);
+			SKSE::log::error(
+				"CalamityAffixes: pending drop record count {} exceeds bound {}; preserving player-owned state until overflow expiry.",
+				result.invalidCount,
+				kMaxPendingDropOwnership);
+			cursor.DrainRemaining("pdop-count-limit");
+			return;
+		}
+		if (result.status != SerializationWire::PendingDropOwnershipReadStatus::kComplete) {
+			_lootState.pendingDropOwnershipOverflow = true;
+			_lootState.pendingDropOwnershipOverflowExpiresAtDay =
+				std::max(_lootState.pendingDropOwnershipOverflowExpiresAtDay,
+						detail::GetInGameDayStamp() + kPendingDropOwnershipLifetimeDays);
+			SKSE::log::warn("CalamityAffixes: truncated PDOP record; retaining recovered exact handoffs and using bounded orphan protection.");
+			cursor.DrainRemaining("partial-record-recovery");
+			return;
+		}
+		_lootState.pendingDropOwnershipOverflow = result.overflow;
+		_lootState.pendingDropOwnershipOverflowExpiresAtDay = result.overflowExpiresAtDay;
+	}
+
 	void EventBridge::FinalizeLoadedSerializationState()
 	{
 		SKSE::log::info("CalamityAffixes: Load() — deserialized {} instance entries, {} runtime states.", _instanceTrackingState.instanceAffixes.size(), _instanceTrackingState.instanceStates.size());

@@ -1,5 +1,12 @@
 Calamity - Reactive Loot & Affixes: Third-Party Notices
 
+FEASR fork attribution: Calamity and the upstream work remain by Eutkyu. See
+https://www.nexusmods.com/skyrimspecialedition/mods/193193 and
+https://github.com/servaltullius/calamity-reactive-loot-affixes. The FEASR
+modified CalamityAffixes.dll is the FEASR version; route FEASR-specific
+technical support to the FEASR project. This attribution does not grant a
+blanket license or clear unrelated assets.
+
 CalamityAffixes.dll is built with the open-source components below, and parts
 of them are compiled into the DLL. Their licenses require these notices to
 travel with the binary. No other third-party fonts ship with this mod; visual

@@ -1,5 +1,7 @@
 #include "CalamityAffixes/EventBridge.h"
 #include "CalamityAffixes/RunewordContractSnapshot.h"
+#include "CalamityAffixes/RunewordContractCompatibilityPolicy.h"
+#include "CalamityAffixes/RunewordRuneWeights.h"
 #include "CalamityAffixes/RuntimeContract.h"
 #include "EventBridge.Loot.Runeword.Detail.h"
 
@@ -143,6 +145,9 @@ namespace CalamityAffixes
 		{
 			a_outEntry = nullptr;
 			a_outXList = nullptr;
+			if (a_instanceKey == 0u) {
+				return false;
+			}
 
 			auto* player = RE::PlayerCharacter::GetSingleton();
 			if (!player) {
@@ -154,6 +159,8 @@ namespace CalamityAffixes
 				return false;
 			}
 
+			RE::InventoryEntryData* foundEntry = nullptr;
+			RE::ExtraDataList* foundXList = nullptr;
 			for (auto* entry : *changes->entryList) {
 				if (!entry || !entry->extraLists) {
 					continue;
@@ -172,14 +179,22 @@ namespace CalamityAffixes
 					if (MakeInstanceKey(uid->baseID, uid->uniqueID) != a_instanceKey) {
 						continue;
 					}
-
-					a_outEntry = entry;
-					a_outXList = xList;
-					return true;
+					// An instance key is safe only when it identifies one individual copy.
+					// Reject stacks and duplicate keys instead of silently choosing one.
+					if (xList->GetCount() != 1 || foundXList) {
+						return false;
+					}
+					foundEntry = entry;
+					foundXList = xList;
 				}
 			}
 
-			return false;
+			if (!foundEntry || !foundXList) {
+				return false;
+			}
+			a_outEntry = foundEntry;
+			a_outXList = foundXList;
+			return true;
 		}
 
 		std::optional<EventBridge::LootItemType> EventBridge::ResolveInstanceLootType(std::uint64_t a_instanceKey) const
@@ -244,6 +259,7 @@ namespace CalamityAffixes
 		void EventBridge::InitializeRunewordCatalog()
 		{
 			_runewordState.ResetCatalog();
+			_feasrRuneforgeContractCompatible = false;
 
 			auto addRecipe = [&](std::string_view a_recipeId,
 				std::string_view a_displayName,
@@ -297,20 +313,44 @@ namespace CalamityAffixes
 					std::optional<LootItemType>{ LootItemType::kArmor };
 			};
 
-			auto loadCompiledFallbackCatalog = [&]() {
-				struct RunewordCatalogRow
-				{
-					std::string_view recipeId{};
-					std::string_view displayName{};
-					std::string_view runeCsv{};
-					std::string_view resultAffixId{};
-					std::optional<LootItemType> recommendedBaseType{};
-				};
-
-				constexpr std::array<RunewordCatalogRow, 95> kRunewordCatalogRows{ {
+			struct RunewordCatalogRow
+			{
+				std::string_view recipeId{};
+				std::string_view displayName{};
+				std::string_view runeCsv{};
+				std::string_view resultAffixId{};
+				std::optional<LootItemType> recommendedBaseType{};
+			};
+			constexpr std::array<RunewordCatalogRow, 95> kRunewordCatalogRows{ {
 #include "RunewordCatalogRows.inl"
-				} };
+			} };
 
+			RunewordContractSnapshot expectedContract{};
+			expectedContract.recipes.reserve(kRunewordCatalogRows.size());
+			for (const auto& [runeName, weight] : kPinnedRunewordRuneWeights) {
+				expectedContract.runeWeightsByName.emplace(std::string(runeName), weight);
+			}
+			for (const auto& row : kRunewordCatalogRows) {
+				RunewordContractRecipeRow expected{};
+				expected.id = row.recipeId;
+				expected.displayName = row.displayName;
+				expected.resultAffixId = row.resultAffixId;
+				if (row.recommendedBaseType) {
+					expected.recommendedBaseIsWeapon = *row.recommendedBaseType == LootItemType::kWeapon;
+				}
+				auto runeCsv = row.runeCsv;
+				while (!runeCsv.empty()) {
+					const auto separator = runeCsv.find(',');
+					const auto rune = separator == std::string_view::npos ? runeCsv : runeCsv.substr(0, separator);
+					if (rune.empty()) break;
+					expected.runeNames.emplace_back(rune);
+					if (separator == std::string_view::npos) break;
+					runeCsv.remove_prefix(separator + 1u);
+				}
+				expectedContract.recipes.push_back(std::move(expected));
+			}
+
+			auto loadCompiledFallbackCatalog = [&]() {
 				auto splitRunes = [](std::string_view a_csv) {
 					std::vector<std::string_view> runes;
 					while (!a_csv.empty()) {
@@ -346,6 +386,13 @@ namespace CalamityAffixes
 			bool loadedFromContract = LoadRunewordContractSnapshotFromRuntime(
 				RuntimeContract::kRuntimeContractRelativePath,
 				contractSnapshot);
+			_feasrRuneforgeContractCompatible = loadedFromContract &&
+				RunewordContractCompatibilityPolicy::MatchesPinnedContract(contractSnapshot, expectedContract);
+			if (!_feasrRuneforgeContractCompatible) {
+				_feasrDiscoveryReady = false;
+				_feasrKnownRunewordRecipeIds.clear();
+				SKSE::log::warn("Runeforge: dependency runtime contract does not match the pinned 2.2.8 contract; FEASR Runeforge is disabled.");
+			}
 
 			if (loadedFromContract) {
 				for (const auto& row : contractSnapshot.recipes) {
@@ -458,8 +505,17 @@ namespace CalamityAffixes
 					}
 				}
 
-					if (_runewordState.selectedBaseKey && !PlayerHasInstanceKey(*_runewordState.selectedBaseKey)) {
-						_runewordState.selectedBaseKey.reset();
+					if (_runewordState.selectedBaseKey) {
+						RE::InventoryEntryData* selectedEntry = nullptr;
+						RE::ExtraDataList* selectedXList = nullptr;
+						const auto selectedKey = *_runewordState.selectedBaseKey;
+						const bool selectedAvailable = ResolvePlayerInventoryInstance(selectedKey, selectedEntry, selectedXList) &&
+							selectedEntry && selectedEntry->object;
+						const bool selectedCompleted = ResolveCompletedRunewordRecipe(selectedKey) != nullptr;
+						if (!selectedAvailable ||
+							(!selectedCompleted && !IsLootObjectEligibleForAffixes(selectedEntry->object))) {
+							_runewordState.selectedBaseKey.reset();
+						}
 					}
 				}
 
@@ -495,7 +551,7 @@ namespace CalamityAffixes
 			}
 
 			SanitizeRunewordState();
-			auto candidates = CollectEquippedRunewordBaseCandidates(true);
+			auto candidates = CollectEquippedRunewordBaseCandidates();
 			if (candidates.empty()) {
 				EmitHudNotification("Runeword: no equipped weapon/armor base found.");
 				return;
@@ -522,7 +578,8 @@ namespace CalamityAffixes
 
 		void EventBridge::CycleRunewordRecipe(std::int32_t a_direction)
 		{
-			if (!_configLoaded || a_direction == 0 || _runewordState.recipes.empty()) {
+			if (!_configLoaded || !_runtimeSettings.enabled.load(std::memory_order_relaxed) ||
+				!_feasrDiscoveryReady || a_direction == 0 || _runewordState.recipes.empty()) {
 				return;
 			}
 
@@ -530,7 +587,8 @@ namespace CalamityAffixes
 			const std::size_t count = _runewordState.recipes.size();
 			auto cursor = static_cast<std::size_t>(_runewordState.recipeCycleCursor % count);
 			const auto isEligible = [&](std::size_t a_idx) {
-				return HasRunewordRuntimeEffect(_runewordState.recipes[a_idx]);
+				const auto& recipe = _runewordState.recipes[a_idx];
+				return HasRunewordRuntimeEffect(recipe) && _feasrKnownRunewordRecipeIds.contains(recipe.id);
 			};
 
 			for (std::size_t step = 0; step < count; ++step) {

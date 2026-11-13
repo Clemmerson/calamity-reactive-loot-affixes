@@ -61,6 +61,10 @@
 		{
 			std::unordered_set<RE::SpellItem*> appliedPassiveSpells{};
 			std::unordered_map<std::uint64_t, InstanceAffixSlots> instanceAffixes{};
+			// Derived identity index: tracked instance key -> item's TESBoundObject FormID.
+			// It is rebuilt from player inventory after load and follows key remaps;
+			// it is not authoritative serialized state.
+			std::unordered_map<std::uint64_t, RE::FormID> instanceBaseObjects{};
 			std::unordered_map<InstanceStateKey, InstanceRuntimeState, InstanceStateKeyHash> instanceStates{};
 			// Selected reforges done on each item since it was last identified or
 			// scoured; drives the rising reforge price (saved in IRFC).

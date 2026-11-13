@@ -1,6 +1,8 @@
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
+#include <span>
 
 namespace CalamityAffixes
 {
@@ -61,6 +63,36 @@ namespace CalamityAffixes
 			MakeTrackedInstanceKey(a_referenceFormID, kDetachedWorldInstanceUID);
 	}
 
+	enum class DropTransferDecision : std::uint8_t
+	{
+		kIgnore,
+		kRetainSource,
+		kRemap,
+		kConflictRetain
+	};
+
+	[[nodiscard]] constexpr DropTransferDecision ResolveDropTransfer(
+		InstanceKey a_sourceKey,
+		InstanceKey a_worldKey,
+		bool a_ambiguousSource,
+		bool a_sourceHasTrackedState,
+		bool a_destinationHasMaterialState) noexcept
+	{
+		if (a_ambiguousSource) {
+			return DropTransferDecision::kConflictRetain;
+		}
+		if (a_sourceKey == 0u || !a_sourceHasTrackedState) {
+			return DropTransferDecision::kIgnore;
+		}
+		if (a_worldKey == 0u) {
+			return DropTransferDecision::kRetainSource;
+		}
+		if (a_destinationHasMaterialState) {
+			return DropTransferDecision::kConflictRetain;
+		}
+		return DropTransferDecision::kRemap;
+	}
+
 	[[nodiscard]] constexpr bool IsDetachedWorldReferenceMatch(
 		InstanceKey a_guardedKey,
 		InstanceKey a_referenceKey) noexcept
@@ -80,6 +112,64 @@ namespace CalamityAffixes
 		       a_playerID != 0u &&
 		       static_cast<std::uint32_t>(a_instanceKey >> 16u) == a_playerID &&
 		       !a_playerInventoryContainsKey;
+	}
+
+	struct InstanceBaseObjectRecoveryCandidate
+	{
+		InstanceKey key{ 0 };
+		std::uint32_t baseObjectFormID{ 0 };
+		bool materialState{ false };
+		bool playerInventoryContainsKey{ false };
+	};
+
+	struct InstanceBaseObjectRecoveryPlan
+	{
+		InstanceKey key{ 0 };
+		bool ambiguous{ false };
+	};
+
+	[[nodiscard]] constexpr InstanceBaseObjectRecoveryPlan ResolveDroppedPlayerInstanceByBaseObject(
+		std::uint32_t a_playerID,
+		std::uint32_t a_baseObjectFormID,
+		std::span<const InstanceBaseObjectRecoveryCandidate> a_candidates,
+		std::int32_t a_eventItemCount = 1,
+		std::int32_t a_remainingPlayerBaseItemCount = 0) noexcept
+	{
+		InstanceBaseObjectRecoveryPlan plan{};
+		if (a_playerID == 0u || a_baseObjectFormID == 0u) {
+			return plan;
+		}
+		if (a_eventItemCount != 1 || a_remainingPlayerBaseItemCount != 0) {
+			plan.ambiguous = std::ranges::any_of(a_candidates, [&](const auto& a_candidate) {
+				return a_candidate.key != 0u &&
+				       a_candidate.baseObjectFormID == a_baseObjectFormID &&
+				       a_candidate.materialState &&
+				       !a_candidate.playerInventoryContainsKey &&
+				       static_cast<std::uint32_t>(a_candidate.key >> 16u) == a_playerID;
+			});
+			return plan;
+		}
+
+		for (const auto& candidate : a_candidates) {
+			if (candidate.key == 0u ||
+				candidate.baseObjectFormID != a_baseObjectFormID ||
+				!candidate.materialState ||
+				candidate.playerInventoryContainsKey ||
+				static_cast<std::uint32_t>(candidate.key >> 16u) != a_playerID) {
+				continue;
+			}
+
+			if (plan.key == 0u) {
+				plan.key = candidate.key;
+				continue;
+			}
+			if (plan.key != candidate.key) {
+				plan.key = 0u;
+				plan.ambiguous = true;
+				return plan;
+			}
+		}
+		return plan;
 	}
 
 	[[nodiscard]] constexpr InstanceKeyTransferPlan ResolveInstanceKeyTransfer(

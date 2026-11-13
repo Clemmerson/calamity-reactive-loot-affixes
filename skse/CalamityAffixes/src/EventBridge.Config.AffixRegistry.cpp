@@ -12,7 +12,7 @@ namespace CalamityAffixes
 			a_affix.id);
 		a_affix.displayNameEn = detail::ResolveSynthesizedLocalizedDisplayName(
 			a_affix.displayNameEn,
-			a_affix.displayName);
+			a_affix.id);
 		a_affix.displayNameKo = detail::ResolveSynthesizedLocalizedDisplayName(
 			a_affix.displayNameKo,
 			a_affix.displayName);
