@@ -9,7 +9,7 @@ It includes native Runeforge workstation and menu integration, source-level comp
 - Original source: [servaltullius/calamity-reactive-loot-affixes](https://github.com/servaltullius/calamity-reactive-loot-affixes)
 - Original mod: [Calamity 2 — Reactive Loot and Affixes on Nexus Mods](https://www.nexusmods.com/skyrimspecialedition/mods/193193)
 - FEASR-specific technical support: open an issue in this repository and identify the installed DLL as the **FEASR version of `CalamityAffixes.dll`**.
-- Original Korean Calamity README: [README.ko.md](README.ko.md)
+- Archived upstream Korean README: [README.ko.md](README.ko.md)
 
 ## What this fork contains
 

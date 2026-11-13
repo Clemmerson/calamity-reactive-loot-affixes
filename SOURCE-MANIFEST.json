@@ -18,10 +18,10 @@
     "source_revision_commit": "207d39108a816122205d7bc6eaec829d4d3428a4",
     "source_revision_tree": "7283008a3143a6546250791ed4776a0fc443c9f0",
     "native_source_file_count": 296,
-    "changed_paths_excluding_manifest": 123,
+    "changed_paths_excluding_manifest": 131,
     "path_summary": {
-      "added": 67,
-      "modified": 56,
+      "added": 73,
+      "modified": 58,
       "deleted": 0
     },
     "commits": [
@@ -37,7 +37,9 @@
         "commit": "207d391",
         "description": "Register accepted FEASR native source units in CMake"
       }
-    ]
+    ],
+    "documentation_commit": "6055aa2",
+    "documentation_commit_scope": "English-primary landing/index and selected translations; Korean source companions retained; no gameplay/build source changes"
   },
   "builds": {
     "accepted_pc1_2": {
@@ -61,11 +63,17 @@
     }
   },
   "history_audit": {
-    "scope": "Inherited upstream history: 7,190 blobs previously scanned. Final candidate adds 73 blobs scanned for high-confidence secret patterns and private permission reference IDs; final manifest content checked separately.",
+    "scope": "Inherited upstream history: 7,190 blobs previously scanned. Final candidate adds 79 blobs scanned for high-confidence secret patterns and private permission reference IDs; final manifest content checked separately.",
     "result": "No high-confidence token/private-key patterns or private permission reference IDs found."
   },
   "permission_scope": "Author permission is confirmed by the project owner for the described Runeforge expansion, including modified Calamity source and DLL, with Eutkyu credit, original Nexus link, and FEASR-specific support routing. No blanket upstream-code license or unrelated asset clearance is asserted.",
   "changed_files": [
+    {
+      "status": "M",
+      "path": "AGENTS.md",
+      "bytes": 6162,
+      "sha256": "c71daeb44103823d93a446acd61c7a6f255a9280d081e22df893090b288c3eda"
+    },
     {
       "status": "A",
       "path": "BUILDING.md",
@@ -87,20 +95,26 @@
     {
       "status": "A",
       "path": "FEASR-CHANGE-INVENTORY.md",
-      "bytes": 8976,
-      "sha256": "1bb42f4c2d332630377bca7af70be7ed962d6648fdd666056fe790d274277beb"
+      "bytes": 9288,
+      "sha256": "ab6d5168f92f581984363d0c2d7c43905784de19f0e831a4344bdfb42136599a"
+    },
+    {
+      "status": "A",
+      "path": "README.ko.md",
+      "bytes": 38306,
+      "sha256": "4a0365445f8c0747a9e8dbec0861d9b50e997320a0bf2be6d626e8715de98db5"
     },
     {
       "status": "M",
       "path": "README.md",
-      "bytes": 2611,
-      "sha256": "84ebe773b4355347bb86c18b3b4e12b726dbfbb2010aa83aeb94b33ef3320958"
+      "bytes": 3442,
+      "sha256": "79d2cf295bebf06531cab9eadf10a7b750dc4f3da2cde687ed8f1e97c04f3308"
     },
     {
       "status": "A",
       "path": "REPOSITORY-METADATA.md",
-      "bytes": 1947,
-      "sha256": "b558049c0b5aefc06587de005f933a277d31c215fd7ddde838dee33283789c45"
+      "bytes": 2470,
+      "sha256": "4d9befa0ddd274b830388fa83afc69cac72eb6a64b9c219ec07efacffb266b7a"
     },
     {
       "status": "A",
@@ -117,8 +131,44 @@
     {
       "status": "A",
       "path": "UPSTREAM.md",
-      "bytes": 1657,
-      "sha256": "e45a1f97250bedbe84aef26223b1ec64dc33ed2ae2d5fbc9b807ce37ef25d302"
+      "bytes": 1735,
+      "sha256": "b9f211dc6cdd538af25b7c4baea0989b91c9c9d6afb7b1fa9eb7bb72f003de6c"
+    },
+    {
+      "status": "A",
+      "path": "docs/AFFIX_CATALOG.en.md",
+      "bytes": 3633,
+      "sha256": "eb5b4671dee8fec75233bb04b35af151e89d1b4b8cb3fe1e06ec4f212402c19e"
+    },
+    {
+      "status": "A",
+      "path": "docs/INDEX.ko.md",
+      "bytes": 4645,
+      "sha256": "ff967c3dc13c4770c7c44e463c3e72cda91a44763cc97f51499f874180009b4b"
+    },
+    {
+      "status": "M",
+      "path": "docs/INDEX.md",
+      "bytes": 2898,
+      "sha256": "99ca8edd23050f1d042f8f6aade557443ff8de068f9b08ac40d041a11c1e1552"
+    },
+    {
+      "status": "A",
+      "path": "docs/LANGUAGE-AND-TRANSLATION.md",
+      "bytes": 3092,
+      "sha256": "b4af4095e91ecbcc62c3547f062b64ce67e954ccd25b5288f4ef97bbcb7ced21"
+    },
+    {
+      "status": "A",
+      "path": "docs/QA_SMOKE_CHECKLIST.en.md",
+      "bytes": 8844,
+      "sha256": "7964b2e0b220ff8bfd2dcd85737dbf0f0e3d3dcbe77138e18722c3dff37bd9e4"
+    },
+    {
+      "status": "A",
+      "path": "docs/QA_STABILITY_SCENARIOS.en.md",
+      "bytes": 5144,
+      "sha256": "ae38137b427b8d48ca1f4f412fb5d5673e1a1e01867f1a8866ec93363e71728a"
     },
     {
       "status": "M",

@@ -4,22 +4,31 @@
 - FEASR PC1.1 source reconstruction: `6ba338b` (unaccepted local RW95 changes excluded).
 - Accepted PC1.2 workstation readiness change: `0c75027`.
 - Native CMake registration: `207d391`.
+- Documentation-only English-primary translation commit: `6055aa2`; no gameplay or build source changed in that commit.
 - Native source files under `include/`, `src/`, and `tests/`: 296.
-- Changed paths from the pinned baseline, excluding the self-referential manifest file: 123 (67 added, 56 modified, 0 deleted).
+- Changed paths from the pinned baseline, excluding the self-referential manifest file: 131 (73 added, 58 modified, 0 deleted).
 - No newer upstream commit was merged. Exact per-file byte lengths and SHA-256 values are in `SOURCE-MANIFEST.json`.
 - The complete build comparison is documented in `BUILDING.md`; the clean build is not byte-identical to the accepted PC1.2 DLL.
 - Two unaccepted local changes are excluded: duplicate-equipped-Runeword suppression and the recipe/base incompatibility restriction.
 
 ```text
+M	AGENTS.md
 A	BUILDING.md
 A	CHANGELOG-FEASR.md
 A	COMPATIBILITY.md
 A	FEASR-CHANGE-INVENTORY.md
+A	README.ko.md
 M	README.md
 A	REPOSITORY-METADATA.md
 A	SUPPORT.md
 M	THIRD_PARTY_NOTICES.txt
 A	UPSTREAM.md
+A	docs/AFFIX_CATALOG.en.md
+A	docs/INDEX.ko.md
+M	docs/INDEX.md
+A	docs/LANGUAGE-AND-TRANSLATION.md
+A	docs/QA_SMOKE_CHECKLIST.en.md
+A	docs/QA_STABILITY_SCENARIOS.en.md
 M	skse/CalamityAffixes/CMakeLists.txt
 M	skse/CalamityAffixes/include/CalamityAffixes/AffixCraftingPolicy.h
 A	skse/CalamityAffixes/include/CalamityAffixes/DropPickupInventoryIdentityPolicy.h
