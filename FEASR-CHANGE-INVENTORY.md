@@ -5,7 +5,7 @@
 - Accepted PC1.2 workstation readiness change: `0c75027`.
 - Native CMake registration: `207d391`.
 - Native source files under `include/`, `src/`, and `tests/`: 296.
-- Changed tracked/public documentation paths from the pinned baseline: 123 (67 added, 56 modified, 0 deleted).
+- Changed paths from the pinned baseline, excluding the self-referential manifest file: 123 (67 added, 56 modified, 0 deleted).
 - No newer upstream commit was merged. Exact per-file byte lengths and SHA-256 values are in `SOURCE-MANIFEST.json`.
 - The complete build comparison is documented in `BUILDING.md`; the clean build is not byte-identical to the accepted PC1.2 DLL.
 - Two unaccepted local changes are excluded: duplicate-equipped-Runeword suppression and the recipe/base incompatibility restriction.

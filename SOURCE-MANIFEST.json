@@ -18,7 +18,7 @@
     "source_revision_commit": "207d39108a816122205d7bc6eaec829d4d3428a4",
     "source_revision_tree": "7283008a3143a6546250791ed4776a0fc443c9f0",
     "native_source_file_count": 296,
-    "changed_paths_from_baseline": 123,
+    "changed_paths_excluding_manifest": 123,
     "path_summary": {
       "added": 67,
       "modified": 56,
@@ -61,7 +61,7 @@
     }
   },
   "history_audit": {
-    "scope": "All reachable inherited upstream history was previously scanned (7,190 blobs); this candidate reconstruction adds a fresh scan of 66 blobs.",
+    "scope": "Inherited upstream history: 7,190 blobs previously scanned. Final candidate adds 72 blobs scanned for high-confidence secret patterns and private permission reference IDs; final manifest content checked separately.",
     "result": "No high-confidence token/private-key patterns or private permission reference IDs found."
   },
   "permission_scope": "Author permission is confirmed by the project owner for the described Runeforge expansion, including modified Calamity source and DLL, with Eutkyu credit, original Nexus link, and FEASR-specific support routing. No blanket upstream-code license or unrelated asset clearance is asserted.",
@@ -87,8 +87,8 @@
     {
       "status": "A",
       "path": "FEASR-CHANGE-INVENTORY.md",
-      "bytes": 8959,
-      "sha256": "190c6941a350b10dd996e4f0a39e37c910d7c307cd61434bb8018b75cd983b37"
+      "bytes": 8976,
+      "sha256": "1bb42f4c2d332630377bca7af70be7ed962d6648fdd666056fe790d274277beb"
     },
     {
       "status": "M",
