@@ -587,8 +587,8 @@
     {
       "status": "M",
       "path": "skse/CalamityAffixes/src/EventBridge.Loot.Runeword.PanelState.cpp",
-      "bytes": 26636,
-      "sha256": "0906550ec3684fc026e67cc616a57d5c0fc1869de7e2d711fd842981a04c08f3"
+      "bytes": 26651,
+      "sha256": "a791824ce9b1cf2d5da9d0866d7ea130088423eac1d58e59e521035c199262a2"
     },
     {
       "status": "M",

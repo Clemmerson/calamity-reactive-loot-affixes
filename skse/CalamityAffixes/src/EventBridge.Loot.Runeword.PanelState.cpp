@@ -65,14 +65,14 @@ namespace CalamityAffixes
 			a_panelState.baseCompatibilityMessageEn.append(
 				detail::DescribeSpecializedRunewordBaseEn(requirement));
 			a_panelState.baseCompatibilityMessageEn.append(
-				". The selected base is incompatible; engraving is blocked.");
+				". The selected base is not recommended; transmute remains allowed.");
 
 			a_panelState.baseCompatibilityMessageKo =
 				"베이스 불일치: 이 룬워드는 ";
 			a_panelState.baseCompatibilityMessageKo.append(
 				detail::DescribeSpecializedRunewordBaseKo(requirement));
 			a_panelState.baseCompatibilityMessageKo.append(
-				"에 맞춰져 있습니다. 현재 베이스와 호환되지 않아 각인할 수 없습니다.");
+				"에 맞춰져 있습니다. 현재 장비에도 각인할 수 있지만 권장 조합은 아닙니다.");
 		}
 	}
 
