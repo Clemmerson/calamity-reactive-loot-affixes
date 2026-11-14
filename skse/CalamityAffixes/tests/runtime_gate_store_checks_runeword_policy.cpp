@@ -91,8 +91,9 @@ namespace RuntimeGateStoreChecks
 
 			// Base selection should also clear mutable in-progress state for completed runeword bases.
 			if (baseSource.find("if (completedRecipe)") == std::string::npos ||
-				baseSource.find("ResolveSelectedRunewordRecipe(a_instanceKey, completedRecipe)") == std::string::npos ||
-				baseSource.find("_runewordState.instanceStates.erase(a_instanceKey);") == std::string::npos) {
+				baseSource.find("ResolveSelectedRunewordRecipe(a_instanceKey, completedRecipe, a_allowUndiscoveredRecipe)") == std::string::npos ||
+				baseSource.find("_runewordState.instanceStates.erase(a_instanceKey);") == std::string::npos ||
+				baseSource.find("!_feasrKnownRunewordRecipeIds.contains(recipe->id)") == std::string::npos) {
 				std::cerr << "runeword_completed_selection: base-selection completed-state guard is missing\n";
 				return false;
 			}
@@ -704,7 +705,7 @@ namespace RuntimeGateStoreChecks
 				recipeUiCursorUpdatePos < recipeUiGuardPos ||
 				catalogText->find("const auto isEligible = [&](std::size_t a_idx)") == std::string::npos ||
 				catalogText->find("if (!isEligible(cursor))") == std::string::npos ||
-				catalogText->find("return HasRunewordRuntimeEffect(_runewordState.recipes[a_idx]);") == std::string::npos ||
+				catalogText->find("return HasRunewordRuntimeEffect(recipe) && _feasrKnownRunewordRecipeIds.contains(recipe.id);") == std::string::npos ||
 				baseSelectionText->find("const auto rwIt = _runewordState.recipeIndexByResultAffixToken.find(token);") == std::string::npos ||
 				baseSelectionText->find("if (!HasRunewordRuntimeEffect(recipe))") == std::string::npos ||
 				baseSelectionText->find("return std::addressof(recipe);") == std::string::npos) {
@@ -907,7 +908,7 @@ namespace RuntimeGateStoreChecks
 				std::cerr << "synthesized_runeword_tooltip_summary: synthesized runeword tooltip-summary guard is missing\n";
 				return false;
 			}
-			if (synthesisSource.find("const std::string recipeNameEn = recipe.displayNameEn.empty() ? recipe.displayName : recipe.displayNameEn;") == std::string::npos ||
+			if (synthesisSource.find("const std::string recipeNameEn = recipe.displayNameEn.empty() ? recipe.id : recipe.displayNameEn;") == std::string::npos ||
 				synthesisSource.find("const std::string recipeNameKo = recipe.displayNameKo.empty() ? recipe.displayName : recipe.displayNameKo;") == std::string::npos ||
 				synthesisSource.find("out.displayNameEn = \"Runeword \" + recipeNameEn + \" \" + suffix;") == std::string::npos ||
 				synthesisSource.find("out.displayNameKo = \"룬워드 \" + recipeNameKo + \" \" + suffix;") == std::string::npos ||
@@ -1020,6 +1021,7 @@ namespace RuntimeGateStoreChecks
 				transmuteSource.find("ResolveRunewordApplyBlockReason(a_instanceKey, a_recipe)") == std::string::npos ||
 				transmuteSource.find("ResolveSelectedRunewordBaseInstance(instanceKey, entry, xList, &baseResolveFailure, false)") == std::string::npos ||
 				transmuteSource.find("ResolvePendingRunewordRecipe(instanceKey)") == std::string::npos ||
+				transmuteSource.find("!_feasrKnownRunewordRecipeIds.contains(recipe->id)") == std::string::npos ||
 				transmuteSource.find("ResolveRunewordApplyBlockReason(instanceKey, *recipe)") == std::string::npos ||
 				transmuteSource.find("runeword result affix missing before transmute") == std::string::npos ||
 				transmuteSource.find("note.append(BuildRunewordApplyBlockMessage(blockReason));") == std::string::npos ||
@@ -1031,11 +1033,11 @@ namespace RuntimeGateStoreChecks
 				transmuteSource.find("removed existing runeword for re-transmutation") != std::string::npos ||
 				transmuteSource.find("_runewordState.transmuteInProgress") == std::string::npos ||
 				transmuteSource.find("Runeword: transmute already in progress.") == std::string::npos ||
-				transmuteSource.find("if (!PlayerHasInstanceKey(instanceKey))") == std::string::npos ||
+				transmuteSource.find("if (!ResolvePlayerInventoryInstance(instanceKey, postConsumeEntry, postConsumeXList))") == std::string::npos ||
 				transmuteFragmentsSource.find("consume-postcheck-partial") == std::string::npos ||
 				transmuteFragmentsSource.find("GrantRunewordFragments(") == std::string::npos ||
 				transmuteFragmentsSource.find("PlaceObjectAtMe(fragmentItem, false)") == std::string::npos ||
-				transmuteSource.find("ApplyRunewordResult(instanceKey, *recipe, &applyFailureReason)") == std::string::npos ||
+				transmuteSource.find("ApplyRunewordResult(instanceKey, *recipe, &applyFailureReason, a_allowUnknownRecipeDebug)") == std::string::npos ||
 				transmuteSource.find(": fragments restored.") == std::string::npos ||
 				transmuteSource.find(": fragment rollback partial.") == std::string::npos) {
 				std::cerr << "runeword_transmute_safety: transmute pre-consume safety guard is missing\n";
