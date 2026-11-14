@@ -3,7 +3,7 @@ name: ci-verify
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, "feasr/**"]
   workflow_dispatch:
 
 permissions:
@@ -14,6 +14,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  feasr-source-audit:
+    name: FEASR source and documentation audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate FEASR source manifest and ancestry
+        run: python3 tools/verify_source_manifest.py
+
+      - name: Validate public documentation links
+        run: python3 tools/verify_public_docs.py
+
   affix-lint:
     name: Affix lint
     runs-on: ubuntu-latest

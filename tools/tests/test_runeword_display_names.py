@@ -72,16 +72,12 @@ class RunewordRecipeNameLanguageTests(unittest.TestCase):
     """RunewordRecipe::displayName is the Korean name. 2.2.1 still let it into
     the English base label "[Runeword: 카오스]" and three HUD notes, because
     each site copied the name on its own. Text built in the DLL uses HudName()
-    (English); the panel gets En/Ko pairs. Only the catalog assignment,
-    empty-name fallbacks, and the legacy Korean payload fields may read
-    displayName directly."""
+    (English); the panel gets En/Ko pairs. Only the catalog assignment, Korean-name fallbacks, and the legacy
+    Korean payload fields may read displayName directly. English synthesis
+    falls back to recipe ID, not a Korean name."""
 
     ALLOWED = {
         ("EventBridge.Loot.Runeword.Catalog.cpp", "recipe.displayName = recipe.displayNameKo;"),
-        (
-            "EventBridge.Config.RunewordSynthesis.cpp",
-            "const std::string recipeNameEn = recipe.displayNameEn.empty() ? recipe.displayName : recipe.displayNameEn;",
-        ),
         (
             "EventBridge.Config.RunewordSynthesis.cpp",
             "const std::string recipeNameKo = recipe.displayNameKo.empty() ? recipe.displayName : recipe.displayNameKo;",
@@ -102,6 +98,9 @@ class RunewordRecipeNameLanguageTests(unittest.TestCase):
                 if pattern.search(line):
                     found.add((path.name, line.strip()))
         self.assertEqual(found, self.ALLOWED)
+        synthesis = (REPO_ROOT / "skse/CalamityAffixes/src/EventBridge.Config.RunewordSynthesis.cpp").read_text(encoding="utf-8")
+        self.assertIn("recipe.displayNameEn.empty() ? recipe.id : recipe.displayNameEn", synthesis)
+        self.assertNotIn("recipe.displayNameEn.empty() ? recipe.displayName :", synthesis)
 
 
 if __name__ == "__main__":

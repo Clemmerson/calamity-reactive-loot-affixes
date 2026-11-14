@@ -17,7 +17,7 @@ runs:
         path: |
           ~/.cargo/bin/xwin
           ~/.xwin-cache
-        key: xwin-${{ runner.os }}-0.7.0-manifest17
+        key: xwin-${{ runner.os }}-0.10.0-crt-auto-sdk26100-manifest17
 
     - name: Cache CommonLibSSE install
       uses: actions/cache@v4
@@ -32,7 +32,7 @@ runs:
         sudo apt-get install --yes --no-install-recommends clang-19 lld-19 llvm-19 ninja-build
 
         if [[ ! -x "$HOME/.cargo/bin/xwin" ]]; then
-          cargo install xwin --version 0.7.0 --locked
+          cargo install xwin --version 0.10.0 --locked
         fi
         echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
@@ -48,8 +48,10 @@ runs:
     - name: Prepare xwin sysroot
       shell: bash
       run: |
-        xwin --accept-license --cache-dir "$HOME/.xwin-cache" splat \
-          --use-winsysroot-style \
+        xwin --accept-license --cache-dir "$HOME/.xwin-cache" \
+          --manifest-version 17 \
+          --sdk-version 10.0.26100 \
+          splat --use-winsysroot-style \
           --output "$RUNNER_TEMP/caff-xwin"
 
         # CommonLib requests Windows' mixed-case Version.lib. xwin 0.7 emits

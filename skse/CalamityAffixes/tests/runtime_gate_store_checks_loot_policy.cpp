@@ -745,10 +745,13 @@ namespace RuntimeGateStoreChecks
 			source->find("_lootState.rerollGuard.ConsumePlayerDropPickupInstanceKey(") == std::string::npos ||
 			source->find("MakeDetachedWorldInstanceKey(referenceFormID)") == std::string::npos ||
 			source->find("IsDetachedWorldReferenceMatch(") == std::string::npos ||
-			source->find("RemapInstanceKey(dropSourceKey, detachedWorldKey);") == std::string::npos ||
+			source->find("if (dropTransferDecision == DropTransferDecision::kConflictRetain)") == std::string::npos ||
 			source->find("if (dropSourceKey == 0u)") == std::string::npos ||
-			source->find("prunedOrphanedDropKeys = bridge->PruneOrphanedPlayerInstanceKeys();") == std::string::npos ||
-			source->find("RemapInstanceKey(detachedWorldKey, pickupKey);") == std::string::npos ||
+			source->find("TrackPendingDropOwnership(") == std::string::npos ||
+			source->find("if (dropTransferDecision == DropTransferDecision::kRemap)") == std::string::npos ||
+			source->find("if (HasMaterialInstanceState(pickupKey))") == std::string::npos ||
+			source->find("EstablishPendingDropReferenceIdentity(") == std::string::npos ||
+			source->find("if (RemapInstanceKey(detachedWorldKey, pickupKey))") == std::string::npos ||
 			source->find("_lootState.playerContainerStash[stashKey] += a_event->itemCount;") == std::string::npos ||
 			source->find("skipping loot roll (player dropped + re-picked)") == std::string::npos ||
 			source->find("skipping loot roll (player stashed + retrieved)") == std::string::npos) {
@@ -762,10 +765,10 @@ namespace RuntimeGateStoreChecks
 			source->find("if (materialOld && materialLegacyItemKey)") == std::string::npos ||
 			source->find(".legacyItemKeyTracked = policyLegacyTracked") == std::string::npos ||
 			source->find("if (HasMaterialInstanceState(a_newKey))") == std::string::npos ||
-			source->find("DiscardInstanceKeyState(transferPlan.oldKey);") == std::string::npos ||
-			source->find("DiscardInstanceKeyState(transferPlan.newKey);") == std::string::npos ||
+			source->find("if (!RemapInstanceKey(transferPlan.oldKey, transferPlan.newKey))") == std::string::npos ||
+			source->find("if (pendingTransfer == PendingDropTransferResult::kConflict)") == std::string::npos ||
 			source->find("AddToken(affixNode") != std::string::npos ||
-			baseSelectionSource->find("created->baseID = player->GetFormID();") == std::string::npos ||
+			baseSelectionSource->find("if (!ResolvePlayerInventoryInstance(a_instanceKey, entry, xList)") == std::string::npos ||
 			lifecycleSource->find("bool EventBridge::NormalizeLegacyPlayerInstanceKeys()") == std::string::npos ||
 			lifecycleSource->find("bool EventBridge::PruneOrphanedPlayerInstanceKeys()") == std::string::npos ||
 			lifecycleSource->find("(void)PruneOrphanedPlayerInstanceKeys();") == std::string::npos ||
