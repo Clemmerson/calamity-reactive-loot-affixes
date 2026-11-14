@@ -182,6 +182,19 @@ namespace RuntimeGateStoreChecks
 				.uniqueId = 0x4B5Au,
 				.count = 4u,
 			});
+			// PDOP v3 is append-only relative to the nine established records.
+			// Include an owned object with a known reference identity so the
+			// golden bytes verify the full current wire layout.
+			fixture.pendingDropOwnershipOverflow = true;
+			fixture.pendingDropOwnershipOverflowExpiresAtDay = 0x01020304u;
+			fixture.pendingDropOwnership.push_back({
+				.ownerFormId = 0x11223344u,
+				.uniqueId = 0x5566u,
+				.baseFormId = 0xAABBCCDDu,
+				.expiresAtDay = 0x05060708u,
+				.referenceFormId = 0x10203040u,
+				.referenceIdentityEstablished = 1u,
+			});
 			return fixture;
 		}
 
@@ -189,7 +202,7 @@ namespace RuntimeGateStoreChecks
 			std::span<const EncodedRecord> a_records,
 			CurrentSaveSnapshot& a_out)
 		{
-			if (a_records.size() != 9u) {
+			if (a_records.size() != kCurrentRecordSequence.size()) {
 				return false;
 			}
 
@@ -366,6 +379,23 @@ namespace RuntimeGateStoreChecks
 				}
 			}
 
+			{
+				WireReader reader(a_records[9].payload);
+				auto readScalar = [&reader]<std::unsigned_integral T>(T& a_value) {
+					return reader.Read(a_value);
+				};
+				auto applyOwnership = [&decoded](PendingDropOwnershipEntry a_entry) {
+					decoded.pendingDropOwnership.push_back(a_entry);
+				};
+				const auto result = ReadCurrentPendingDropOwnershipPayload(
+					readScalar, applyOwnership, a_records[9].contract.version);
+				if (result.status != PendingDropOwnershipReadStatus::kComplete || !reader.AtEnd()) {
+					return false;
+				}
+				decoded.pendingDropOwnershipOverflow = result.overflow;
+				decoded.pendingDropOwnershipOverflowExpiresAtDay = result.overflowExpiresAtDay;
+			}
+
 			a_out = std::move(decoded);
 			return true;
 		}
@@ -375,7 +405,7 @@ namespace RuntimeGateStoreChecks
 	{
 		using namespace CalamityAffixes::SerializationWire;
 
-		constexpr std::array<RecordContract, 9> kGoldenContracts{
+		constexpr std::array<RecordContract, 10> kGoldenContracts{
 			RecordContract{ 0x49415846u, 7u },
 			RecordContract{ 0x49525354u, 1u },
 			RecordContract{ 0x52575244u, 1u },
@@ -385,8 +415,9 @@ namespace RuntimeGateStoreChecks
 			RecordContract{ 0x4C534247u, 2u },
 			RecordContract{ 0x4D464C47u, 1u },
 			RecordContract{ 0x49524643u, 1u },
+			RecordContract{ 0x50444F50u, 3u }, // PDOP: appended pending drop ownership
 		};
-		constexpr std::array<std::string_view, 9> kGoldenPayloadHex{
+		constexpr std::array<std::string_view, 10> kGoldenPayloadHex{
 			"01000000443322116655020807060504030201181716151413121128272625242322213837363534333231",
 			"01000000d4c3b2a1f6e548474645444342414030201080706050c0b0a090",
 			"efcdab895713e0ac68240df0ad0b0100000002020202010101010303030301000000bebafecaefbe887766554433221103000000",
@@ -396,6 +427,7 @@ namespace RuntimeGateStoreChecks
 			"06000100000002000000090000000400000001000000000000000002010000000100000007000000030000000000000000040000000000000000050200000003000000030000000100000008000000",
 			"03",
 			"010000003c2d1e0f5a4b04",
+			"010403020101000000443322116655ddccbbaa080706054030201001",
 		};
 
 		if (kCurrentRecordSequence != kGoldenContracts) {
@@ -406,7 +438,7 @@ namespace RuntimeGateStoreChecks
 		const auto fixture = BuildSerializationFixture();
 		const auto encoded = EncodeCurrentRecords(fixture);
 		if (encoded.size() != kGoldenContracts.size()) {
-			std::cerr << "serialization_wire_contract: current writer did not emit all nine records\n";
+			std::cerr << "serialization_wire_contract: current writer did not emit all ten records\n";
 			return false;
 		}
 		for (std::size_t i = 0u; i < encoded.size(); ++i) {
@@ -500,6 +532,47 @@ namespace RuntimeGateStoreChecks
 		auto countRecovered = [&recoveredReforgeCounts](const InstanceReforgeCountEntry&) { ++recoveredReforgeCounts; };
 		if (ReadCurrentInstanceReforgeCountsPayload(readTruncatedReforge, countRecovered) || recoveredReforgeCounts != 0u) {
 			std::cerr << "serialization_wire_contract: production IRFC reader accepted a truncated entry\n";
+			return false;
+		}
+
+		// PDOP v3: do not admit a partial entry, including a truncated
+		// reference-identity flag, and do not apply an oversized entry set.
+		auto truncatedOwnershipPayload = encoded[9].payload;
+		truncatedOwnershipPayload.pop_back();
+		WireReader truncatedOwnershipReader(truncatedOwnershipPayload);
+		auto readTruncatedOwnership = [&truncatedOwnershipReader]<std::unsigned_integral T>(T& a_value) {
+			return truncatedOwnershipReader.Read(a_value);
+		};
+		std::size_t recoveredOwnershipEntries = 0u;
+		auto applyTruncatedOwnership = [&recoveredOwnershipEntries](PendingDropOwnershipEntry) {
+			++recoveredOwnershipEntries;
+		};
+		const auto truncatedOwnershipResult = ReadCurrentPendingDropOwnershipPayload(
+			readTruncatedOwnership, applyTruncatedOwnership, 3u);
+		if (truncatedOwnershipResult.status != PendingDropOwnershipReadStatus::kTruncated ||
+			recoveredOwnershipEntries != 0u) {
+			std::cerr << "serialization_wire_contract: production PDOP v3 reader accepted truncated ownership\n";
+			return false;
+		}
+
+		std::vector<std::uint8_t> oversizedOwnershipPayload;
+		AppendLittleEndian(oversizedOwnershipPayload, std::uint8_t{ 0u });
+		AppendLittleEndian(oversizedOwnershipPayload, std::uint32_t{ 0u });
+		AppendLittleEndian(oversizedOwnershipPayload, kMaxPendingDropOwnershipEntries + 1u);
+		WireReader oversizedOwnershipReader(oversizedOwnershipPayload);
+		auto readOversizedOwnership = [&oversizedOwnershipReader]<std::unsigned_integral T>(T& a_value) {
+			return oversizedOwnershipReader.Read(a_value);
+		};
+		bool oversizedOwnershipApplied = false;
+		auto rejectOversizedOwnership = [&oversizedOwnershipApplied](PendingDropOwnershipEntry) {
+			oversizedOwnershipApplied = true;
+		};
+		const auto oversizedOwnershipResult = ReadCurrentPendingDropOwnershipPayload(
+			readOversizedOwnership, rejectOversizedOwnership, 3u);
+		if (oversizedOwnershipResult.status != PendingDropOwnershipReadStatus::kSizeLimitExceeded ||
+			oversizedOwnershipResult.invalidCount != kMaxPendingDropOwnershipEntries + 1u ||
+			oversizedOwnershipApplied) {
+			std::cerr << "serialization_wire_contract: production PDOP v3 reader lost its size limit\n";
 			return false;
 		}
 
